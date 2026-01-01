@@ -1,0 +1,103 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using MaestroNotes.Data
+@inject MusicService Service
+
+<EditForm Model="@currentRecord">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    
+    <div style="display: flex;">
+        <div class="form-group">
+            <label for="Komponist">Komponist:</label>     
+            <InputText id="Komponist" class="form-control" @bind-Value="currentRecord.Komponist" />
+            <ValidationMessage For="@(() => currentRecord.Komponist)" />
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Werk">Werk:</label>
+            <InputText id="Werk" class="form-control" @bind-Value="currentRecord.Werk" />
+            <ValidationMessage For="@(() => currentRecord.Werk)" />
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Orchester">Orchester:</label>
+            <InputText id="Orchester" class="form-control" @bind-Value="currentRecord.Orchester" />
+            <ValidationMessage For="@(() => currentRecord.Orchester)" />
+        </div>
+    </div>
+    <div style="display: flex;">
+        <div class="form-group">
+            <label for="Dirigent">Dirigent:</label>
+            <InputText id="Dirigent" class="form-control" @bind-Value="currentRecord.Dirigent" />
+            <ValidationMessage For="@(() => currentRecord.Dirigent)" />
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Solist">Solist:</label>
+            <InputText id="Solist" class="form-control" @bind-Value="currentRecord.Solist" />
+            <ValidationMessage For="@(() => currentRecord.Solist)" />
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Ort">Ort:</label>
+            <InputText id="Ort" class="form-control" @bind-Value="currentRecord.Ort" />
+            <ValidationMessage For="@(() => currentRecord.Ort)" />
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="Bewertung1">Bewertung:</label>
+        <InputTextArea id="Bewertung1" class="form-control" @bind-Value="currentRecord.Bewertung1" rows="8" />
+        <ValidationMessage For="@(() => currentRecord.Bewertung1)" />
+    </div>
+    <div style="display: flex;">
+        <div class="form-group">
+            <label for="Spielsaison">Spielsaison:</label>
+            <select id="Spielsaison" class="form-control" @bind="currentRecord.Spielsaison">
+            @foreach(string n in DefaultLists.SpielSaisonList)
+            {
+                @if (n!="")
+                {
+                    <option value="@n">@n</option>
+                }
+            }
+            </select>
+            <ValidationMessage For="@(() => currentRecord.Spielsaison)" />
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Datum">Datum:</label>
+            <InputDate id="Datum" class="form-control" @bind-Value="currentRecord.Datum" />
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Bewertung2">Notiz:</label>
+            <InputTextArea id="Bewertung2" class="form-control" @bind-Value="currentRecord.Bewertung2" />
+            <ValidationMessage For="@(() => currentRecord.Bewertung2)" />
+        </div>
+    </div>
+    <div style="display: flex;">
+        <div class="flex-column">
+        <br />            
+            <button class="small-button" @onclick="() => Close(true)">
+                <i class="fas fa-save"></i>
+            </button>
+            &nbsp;&nbsp;&nbsp;
+            <button class="small-button" @onclick="() => Close(false)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public MusicRecord currentRecord { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<bool> CloseCallback { get; set; }
+
+    private void Close(bool result)
+    {
+        CloseCallback.InvokeAsync(result);
+    }
+}

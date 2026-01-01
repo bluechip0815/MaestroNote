@@ -1,0 +1,86 @@
+﻿@using MaestroNotes.Data
+@inject MusicService Service
+@inject IJSRuntime JS
+
+<EditForm Model="@currentRecord">
+    <div style="display: flex;">
+        <p>
+            <b>Datei hochladen:</b><br />
+            <InputFile OnChange="UploadFile" accept="application/pdf, image/jpeg, image/png" />
+        </p>
+    </div>
+    <div style="display: flex;">
+        <button class="btn btn-primary" @onclick="Close">Fertig</button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public MusicRecord currentRecord { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<bool> CloseUploadCallback { get; set; }
+
+    private void Close()
+    {
+        CloseUploadCallback.InvokeAsync(false);
+    }
+
+    private string selectedFileName = "";
+    private byte[]? fileBytes;
+    private IBrowserFile? file;
+    private const long MaxFileSize = 1024 * 1024 * 7; // 5 MB limit
+    private async Task UploadFile(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            if (e.FileCount > 0)
+            {
+                file = e.GetMultipleFiles()[0];
+                if (file.Size > MaxFileSize)
+                {
+                    await JS.InvokeVoidAsync("info", "Datei ist zu groß!");
+                    return;
+                }
+
+                selectedFileName = file.Name;
+                fileBytes = null;
+
+                // Read the file into a byte array
+                using (var ms = new MemoryStream())
+                {
+                    DocumentType tag = selectedFileName.EndsWith("pdf", StringComparison.CurrentCultureIgnoreCase)
+                                            ? DocumentType.Pdf : DocumentType.Image;
+                    
+                    var buffer = new byte[file.Size];
+                    await file.OpenReadStream(MaxFileSize).CopyToAsync(ms);
+                    fileBytes = ms.ToArray();
+                    if (fileBytes is not null)
+                    {
+                        selectedFileName = selectedFileName.Substring(selectedFileName.LastIndexOf('\\') + 1);
+                        string message = await Service.SaveFile(currentRecord.Id, selectedFileName, fileBytes, tag);
+                        await JS.InvokeVoidAsync("info", message);
+                    }
+                    else
+                    {
+                        await JS.InvokeVoidAsync("info", "No data found.");
+                    }
+                }
+            }
+            else
+            {
+                // No files selected
+                selectedFileName = string.Empty;
+                fileBytes = null;
+                await JS.InvokeVoidAsync("info", "Leere Datei");
+            }
+        }
+        catch (Exception ex)
+        {
+            selectedFileName = string.Empty;
+            fileBytes = null;
+            await JS.InvokeVoidAsync("info", ex.Message);
+        }
+        StateHasChanged();
+    }
+}

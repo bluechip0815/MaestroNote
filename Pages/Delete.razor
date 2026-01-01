@@ -1,0 +1,24 @@
+﻿@using MaestroNotes.Data
+@inject MusicService Service
+
+<h2>
+    Löschen des Datensatzes:
+</h2>
+<p>
+    <button class="btn btn-primary" @onclick="DeleteFile">Wirklich löschen</button>
+    <button class="btn btn-primary" @onclick="Cancel">Abbrechen</button>
+</p>
+
+@code {
+    [Parameter]
+    public EventCallback<bool> CloseDeleteCallback { get; set; }
+
+    private void Cancel()
+    {
+        CloseDeleteCallback.InvokeAsync(false);
+    }
+    private void DeleteFile()
+    {
+        CloseDeleteCallback.InvokeAsync(true);
+    }
+}

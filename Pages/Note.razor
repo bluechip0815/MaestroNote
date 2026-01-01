@@ -1,0 +1,292 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using MaestroNotes.Data
+@inject MusicService Service
+
+<EditForm Model="@currentRecord">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    
+    <div style="display: flex;">
+        <div class="form-group">
+            <label for="Komponist">Komponist:</label>     
+            <!-- Dropdown for selecting an existing item -->
+            <select id="Komponist" class="form-control" @onchange="OnKomponistSelectionChanged">
+                <option value="">Komponist auswählen</option>
+                <option value="new">Anderer (neue Eingabe)</option>
+                @foreach (var komponist in DefaultLists.KomponistList)
+                {
+                    <option value="@komponist">@komponist</option>
+                }
+            </select>
+            <!-- Conditional input for new item -->
+            @if (isNewKomponist)
+            {
+                <InputText id="NewKomponist" class="form-control" @bind-Value="currentRecord.Komponist" placeholder="Neuer Komponist" />
+                <ValidationMessage For="@(() => currentRecord.Komponist)" />
+            }
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Werk">Werk:</label>
+            <!-- Dropdown for selecting an existing item -->
+            <select id="Werk" class="form-control" @onchange="OnWerkSelectionChanged">
+                <option value="">Werk auswählen</option>
+                <option value="new">Anderes (neue Eingabe)</option>
+                @foreach (var n in DefaultLists.WerkList)
+                {
+                    <option value="@n">@n</option>
+                }
+            </select>
+            <!-- Conditional input for new item -->
+            @if (isNewWerk)
+            {
+                <InputText id="NewWerk" class="form-control" @bind-Value="currentRecord.Werk" placeholder="Neues Werk" />
+                <ValidationMessage For="@(() => currentRecord.Werk)" />
+            }
+
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Orchester">Orchester:</label>
+            <!-- Dropdown for selecting an existing item -->
+            <select id="Orchester" class="form-control" @onchange="OnOrchesterSelectionChanged">
+                <option value="">Orchester auswählen</option>
+                <option value="new">Anderes (neue Eingabe)</option>
+                @foreach (var n in DefaultLists.OrchesterList)
+                {
+                    <option value="@n">@n</option>
+                }
+            </select>
+            <!-- Conditional input for new item -->
+            @if (isNewOrchester)
+            {
+                <InputText id="NewOrchester" class="form-control" @bind-Value="currentRecord.Orchester" placeholder="Neues Orchester" />
+                <ValidationMessage For="@(() => currentRecord.Orchester)" />
+            }
+        </div>
+    </div>
+    <div style="display: flex;">
+        <div class="form-group">
+            <label for="Dirigent">Dirigent:</label>
+            <!-- Dropdown for selecting an existing item -->
+            <select id="Dirigent" class="form-control" @onchange="OnDirigentSelectionChanged">
+                <option value="">Dirigent auswählen</option>
+                <option value="new">Anderer (neue Eingabe)</option>
+                @foreach (var n in DefaultLists.DirigentList)
+                {
+                    <option value="@n">@n</option>
+                }
+            </select>
+            <!-- Conditional input for new item -->
+            @if (isNewDirigent)
+            {
+                <InputText id="NewDirigent" class="form-control" @bind-Value="currentRecord.Dirigent" placeholder="Neuer Dirigent" />
+                <ValidationMessage For="@(() => currentRecord.Dirigent)" />
+            }
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Solist">Solist:</label>
+            <!-- Dropdown for selecting an existing item -->
+            <select id="Solist" class="form-control" @onchange="OnSolistSelectionChanged">
+                <option value="">Solist auswählen</option>
+                <option value="new">Anderer (neue Eingabe)</option>
+                @foreach (var n in DefaultLists.SolistList)
+                {
+                    <option value="@n">@n</option>
+                }
+            </select>
+            <!-- Conditional input for new item -->
+            @if (isNewSolist)
+            {
+                <InputText id="NewSolist" class="form-control" @bind-Value="currentRecord.Solist" placeholder="Neuer Solist" />
+                <ValidationMessage For="@(() => currentRecord.Solist)" />
+            }
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Ort">Ort:</label>
+            <!-- Dropdown for selecting an existing item -->
+            <select id="Ort" class="form-control" @onchange="OnOrtSelectionChanged">
+                <option value="">Ort auswählen</option>
+                <option value="new">Anderer (neue Eingabe)</option>
+                @foreach (var n in DefaultLists.OrtList)
+                {
+                    <option value="@n">@n</option>
+                }
+            </select>
+            <!-- Conditional input for new item -->
+            @if (isNewOrt)
+            {
+                <InputText id="NewOrt" class="form-control" @bind-Value="currentRecord.Ort" placeholder="Neuer Ort" />
+                <ValidationMessage For="@(() => currentRecord.Ort)" />
+            }
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="Bewertung1">Bewertung:</label>
+        <InputTextArea id="Bewertung1" class="form-control" @bind-Value="currentRecord.Bewertung1" rows="8" />
+        <ValidationMessage For="@(() => currentRecord.Bewertung1)" />
+    </div>
+    <div style="display: flex;">
+        <div class="form-group">
+            <label for="Spielsaison">Spielsaison:</label>
+            <select id="Spielsaison" class="form-control" @bind="currentRecord.Spielsaison">
+            @foreach(string n in DefaultLists.SpielSaisonList)
+            {
+                @if (n!="")
+                {
+                    <option value="@n">@n</option>
+                }
+            }
+            </select>
+            <ValidationMessage For="@(() => currentRecord.Spielsaison)" />
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Datum">Datum:</label>
+            <InputDate id="Datum" class="form-control" @bind-Value="currentRecord.Datum" />
+        </div>
+        &nbsp;&nbsp;&nbsp;
+        <div class="form-group">
+            <label for="Bewertung2">Notiz:</label>
+            <InputTextArea id="Bewertung2" class="form-control" @bind-Value="currentRecord.Bewertung2" />
+            <ValidationMessage For="@(() => currentRecord.Bewertung2)" />
+        </div>
+    </div>
+    <div style="display: flex;">
+        <div class="flex-column">
+        <br />            
+            <button class="small-button" @onclick="() => Close(true)">
+                <i class="fas fa-save"></i>
+            </button>
+            &nbsp;&nbsp;&nbsp;
+            <button class="small-button" @onclick="() => Close(false)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    
+    [Parameter]
+    public MusicRecord currentRecord { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<bool> CloseCallback { get; set; }
+
+
+    private void Close(bool result)
+    {
+        CloseCallback.InvokeAsync(result);
+    }
+    private bool isNewKomponist = false;
+    private void OnKomponistSelectionChanged(ChangeEventArgs e)
+    {
+        var selectedValue = e.Value?.ToString();
+
+        if (selectedValue == "new")
+        {
+            // Show text input for entering a new Komponist
+            isNewKomponist = true;
+            currentRecord.Komponist = ""; // Clear the selected value
+        }
+        else if (!string.IsNullOrEmpty(selectedValue))
+        {
+            // Hide text input and use the selected Komponist
+            isNewKomponist = false;
+            currentRecord.Komponist = selectedValue;
+        }
+    }
+    private bool isNewWerk = false;
+    private void OnWerkSelectionChanged(ChangeEventArgs e)
+    {
+        var selectedValue = e.Value?.ToString();
+
+        if (selectedValue == "new")
+        {
+            // Show text input for entering a new Komponist
+            isNewWerk = true;
+            currentRecord.Werk = ""; // Clear the selected value
+        }
+        else if (!string.IsNullOrEmpty(selectedValue))
+        {
+            // Hide text input and use the selected Komponist
+            isNewWerk = false;
+            currentRecord.Werk = selectedValue;
+        }
+    }
+    private bool isNewOrchester = false;
+    private void OnOrchesterSelectionChanged(ChangeEventArgs e)
+    {
+        var selectedValue = e.Value?.ToString();
+
+        if (selectedValue == "new")
+        {
+            // Show text input for entering a new Komponist
+            isNewOrchester = true;
+            currentRecord.Orchester = ""; // Clear the selected value
+        }
+        else if (!string.IsNullOrEmpty(selectedValue))
+        {
+            // Hide text input and use the selected Komponist
+            isNewOrchester = false;
+            currentRecord.Orchester = selectedValue;
+        }
+    }
+    private bool isNewDirigent = false;
+    private void OnDirigentSelectionChanged(ChangeEventArgs e)
+    {
+        var selectedValue = e.Value?.ToString();
+
+        if (selectedValue == "new")
+        {
+            // Show text input for entering a new Komponist
+            isNewDirigent = true;
+            currentRecord.Dirigent = ""; // Clear the selected value
+        }
+        else if (!string.IsNullOrEmpty(selectedValue))
+        {
+            // Hide text input and use the selected Komponist
+            isNewDirigent = false;
+            currentRecord.Dirigent = selectedValue;
+        }
+    }
+    private bool isNewSolist = false;
+    private void OnSolistSelectionChanged(ChangeEventArgs e)
+    {
+        var selectedValue = e.Value?.ToString();
+
+        if (selectedValue == "new")
+        {
+            // Show text input for entering a new Komponist
+            isNewSolist = true;
+            currentRecord.Solist = ""; // Clear the selected value
+        }
+        else if (!string.IsNullOrEmpty(selectedValue))
+        {
+            // Hide text input and use the selected Komponist
+            isNewSolist = false;
+            currentRecord.Solist = selectedValue;
+        }
+    }
+    private bool isNewOrt = false;
+    private void OnOrtSelectionChanged(ChangeEventArgs e)
+    {
+        var selectedValue = e.Value?.ToString();
+
+        if (selectedValue == "new")
+        {
+            // Show text input for entering a new Komponist
+            isNewOrt = true;
+            currentRecord.Ort = ""; // Clear the selected value
+        }
+        else if (!string.IsNullOrEmpty(selectedValue))
+        {
+            // Hide text input and use the selected Komponist
+            isNewOrt = false;
+            currentRecord.Ort = selectedValue;
+        }
+    }
+}
