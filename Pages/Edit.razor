@@ -8,34 +8,34 @@
     
     <div style="display: flex;">
         <div class="form-group">
-            <label for="Komponist">Komponist:</label>     
-            <InputText id="Komponist" class="form-control" @bind-Value="currentRecord.Komponist" />
-            <ValidationMessage For="@(() => currentRecord.Komponist)" />
+            <label for="Komponist">Komponist (Legacy):</label>
+            <InputText id="Komponist" class="form-control" @bind-Value="currentRecord.KomponistLegacy" />
+            <ValidationMessage For="@(() => currentRecord.KomponistLegacy)" />
         </div>
         &nbsp;&nbsp;&nbsp;
         <div class="form-group">
-            <label for="Werk">Werk:</label>
-            <InputText id="Werk" class="form-control" @bind-Value="currentRecord.Werk" />
-            <ValidationMessage For="@(() => currentRecord.Werk)" />
+            <label for="Werk">Werk (Legacy):</label>
+            <InputText id="Werk" class="form-control" @bind-Value="currentRecord.WerkLegacy" />
+            <ValidationMessage For="@(() => currentRecord.WerkLegacy)" />
         </div>
         &nbsp;&nbsp;&nbsp;
         <div class="form-group">
-            <label for="Orchester">Orchester:</label>
-            <InputText id="Orchester" class="form-control" @bind-Value="currentRecord.Orchester" />
-            <ValidationMessage For="@(() => currentRecord.Orchester)" />
+            <label for="Orchester">Orchester (Legacy):</label>
+            <InputText id="Orchester" class="form-control" @bind-Value="currentRecord.OrchesterLegacy" />
+            <ValidationMessage For="@(() => currentRecord.OrchesterLegacy)" />
         </div>
     </div>
     <div style="display: flex;">
         <div class="form-group">
-            <label for="Dirigent">Dirigent:</label>
-            <InputText id="Dirigent" class="form-control" @bind-Value="currentRecord.Dirigent" />
-            <ValidationMessage For="@(() => currentRecord.Dirigent)" />
+            <label for="Dirigent">Dirigent (Legacy):</label>
+            <InputText id="Dirigent" class="form-control" @bind-Value="currentRecord.DirigentLegacy" />
+            <ValidationMessage For="@(() => currentRecord.DirigentLegacy)" />
         </div>
         &nbsp;&nbsp;&nbsp;
         <div class="form-group">
-            <label for="Solist">Solist:</label>
-            <InputText id="Solist" class="form-control" @bind-Value="currentRecord.Solist" />
-            <ValidationMessage For="@(() => currentRecord.Solist)" />
+            <label for="Solist">Solist (Legacy):</label>
+            <InputText id="Solist" class="form-control" @bind-Value="currentRecord.SolistLegacy" />
+            <ValidationMessage For="@(() => currentRecord.SolistLegacy)" />
         </div>
         &nbsp;&nbsp;&nbsp;
         <div class="form-group">
@@ -45,9 +45,9 @@
         </div>
     </div>
     <div class="form-group">
-        <label for="Bewertung1">Bewertung:</label>
-        <InputTextArea id="Bewertung1" class="form-control" @bind-Value="currentRecord.Bewertung1" rows="8" />
-        <ValidationMessage For="@(() => currentRecord.Bewertung1)" />
+        <label for="Bewertung">Bewertung:</label>
+        <InputTextArea id="Bewertung" class="form-control" @bind-Value="currentRecord.Bewertung" rows="8" />
+        <ValidationMessage For="@(() => currentRecord.Bewertung)" />
     </div>
     <div style="display: flex;">
         <div class="form-group">
@@ -67,12 +67,6 @@
         <div class="form-group">
             <label for="Datum">Datum:</label>
             <InputDate id="Datum" class="form-control" @bind-Value="currentRecord.Datum" />
-        </div>
-        &nbsp;&nbsp;&nbsp;
-        <div class="form-group">
-            <label for="Bewertung2">Notiz:</label>
-            <InputTextArea id="Bewertung2" class="form-control" @bind-Value="currentRecord.Bewertung2" />
-            <ValidationMessage For="@(() => currentRecord.Bewertung2)" />
         </div>
     </div>
     <div style="display: flex;">

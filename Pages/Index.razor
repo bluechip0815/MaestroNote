@@ -93,11 +93,38 @@
                                     </div>
                                 }
                             </td>
-                            <td>@record.Komponist</td>
-                            <td>@record.Werk</td>
-                            <td>@record.Orchester</td>
-                            <td>@record.Dirigent</td>
-                            <td>@record.Solist</td>
+                            <td>
+                                @if (record.Werke.Any())
+                                {
+                                    @string.Join(", ", record.Werke.Select(w => w.Komponist?.Name ?? ""))
+                                }
+                                else
+                                {
+                                    @record.KomponistLegacy
+                                }
+                            </td>
+                            <td>
+                                @if (record.Werke.Any())
+                                {
+                                    @string.Join(", ", record.Werke.Select(w => w.Name))
+                                }
+                                else
+                                {
+                                    @record.WerkLegacy
+                                }
+                            </td>
+                            <td>@(record.Orchester?.Name ?? record.OrchesterLegacy)</td>
+                            <td>@(record.Dirigent?.Name ?? record.DirigentLegacy)</td>
+                            <td>
+                                @if (record.Solisten.Any())
+                                {
+                                    @string.Join(", ", record.Solisten.Select(s => s.Name))
+                                }
+                                else
+                                {
+                                    @record.SolistLegacy
+                                }
+                            </td>
                             <td>@record.Spielsaison </td>
                         </tr>
                         @if (DeleteMusicRecord == record)
@@ -127,7 +154,9 @@
                                         </button>
                                     }
                                 </td>
-                                <td colspan="7" style="background-color:azure">@currentRecord1.Bewertung1</td>
+                                <td colspan="7" style="background-color:azure">
+                                    <pre>@(!string.IsNullOrEmpty(currentRecord1.Bewertung) ? currentRecord1.Bewertung : currentRecord1.Bewertung1Legacy)</pre>
+                                </td>
                             </tr>
                         }
                         @if (currentRecord2 == record)

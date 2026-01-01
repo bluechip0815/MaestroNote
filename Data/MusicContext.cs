@@ -6,6 +6,12 @@ namespace MaestroNotes.Data
     {
         public DbSet<MusicRecord> MusicRecords { get; set; }
         public DbSet<Document> Documents { get; set; }
+        public DbSet<Komponist> Komponisten { get; set; }
+        public DbSet<Dirigent> Dirigenten { get; set; }
+        public DbSet<Solist> Solisten { get; set; }
+        public DbSet<Orchester> Orchester { get; set; }
+        public DbSet<Werk> Werke { get; set; }
+
         public string DocumentsPath { get; set; } = "";
         public string ImagesPath { get; set; } = "";
         public string PasswordRO { get; set; } = "";
