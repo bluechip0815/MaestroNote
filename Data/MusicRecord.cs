@@ -8,36 +8,6 @@ namespace MaestroNotes.Data
         [Key]
         public int Id { get; set; } = 0;
 
-        // --- Legacy Fields ---
-        [MaxLength(64)]
-        [Column("Komponist")]
-        public string KomponistLegacy { get; set; } = "";
-
-        [MaxLength(100)]
-        [Column("Werk")]
-        public string WerkLegacy { get; set; } = "";
-
-        [MaxLength(128)]
-        [Column("Orchester")]
-        public string OrchesterLegacy { get; set; } = "";
-
-        [MaxLength(64)]
-        [Column("Dirigent")]
-        public string DirigentLegacy { get; set; } = "";
-
-        [MaxLength(256)]
-        [Column("Solist")]
-        public string SolistLegacy { get; set; } = "";
-
-        [MaxLength(1000)]
-        [Column("Bewertung1")]
-        public string Bewertung1Legacy { get; set; } = "";
-
-        [MaxLength(1000)]
-        [Column("Bewertung2")]
-        public string Bewertung2Legacy { get; set; } = "";
-        // ---------------------
-
         [MaxLength(200)]
         public string Bezeichnung { get; set; } = "";
 
@@ -68,7 +38,6 @@ namespace MaestroNotes.Data
         public void Init(MusicRecord n)
         {
             Id = n.Id;
-            // Map legacy to new for init logic if needed, but primarily use new fields
             Bezeichnung = n.Bezeichnung;
 
             Dirigent = n.Dirigent;
@@ -83,16 +52,7 @@ namespace MaestroNotes.Data
             Datum = n.Datum;
             Bewertung = n.Bewertung;
             Ort = n.Ort;
-            Spielsaison = n.Spielsaison;   
-
-            // Legacy init for safety
-            KomponistLegacy = n.KomponistLegacy;
-            WerkLegacy = n.WerkLegacy;
-            OrchesterLegacy = n.OrchesterLegacy;
-            DirigentLegacy = n.DirigentLegacy;
-            SolistLegacy = n.SolistLegacy;
-            Bewertung1Legacy = n.Bewertung1Legacy;
-            Bewertung2Legacy = n.Bewertung2Legacy;
+            Spielsaison = n.Spielsaison;
         }
 
         public bool Find(string filter)
@@ -109,13 +69,6 @@ namespace MaestroNotes.Data
             if (Werke.Any(w => w.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
                             || (w.Komponist?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true))) return true;
             if (Solisten.Any(s => s.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase))) return true;
-
-            // Fallback to legacy search if migration hasn't happened or to be safe
-            if (KomponistLegacy.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (WerkLegacy.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (OrchesterLegacy.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (DirigentLegacy.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (SolistLegacy.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
 
             return false;
         }

@@ -1,4 +1,5 @@
 ﻿using Serilog;
+using Microsoft.EntityFrameworkCore;
 
 namespace MaestroNotes.Data
 {
@@ -242,6 +243,38 @@ namespace MaestroNotes.Data
                 _context.Set<T>().Remove(entity);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        public List<Komponist> GetAllKomponisten() => _context.Komponisten.ToList();
+        public List<Werk> GetAllWerke() => _context.Werke.Include(w => w.Komponist).ToList();
+        public List<Orchester> GetAllOrchester() => _context.Orchester.ToList();
+        public List<Dirigent> GetAllDirigenten() => _context.Dirigenten.ToList();
+        public List<Solist> GetAllSolisten() => _context.Solisten.ToList();
+
+        public async Task AddKomponist(Komponist k)
+        {
+            _context.Komponisten.Add(k);
+            await _context.SaveChangesAsync();
+        }
+        public async Task AddWerk(Werk w)
+        {
+            _context.Werke.Add(w);
+            await _context.SaveChangesAsync();
+        }
+        public async Task AddOrchester(Orchester o)
+        {
+            _context.Orchester.Add(o);
+            await _context.SaveChangesAsync();
+        }
+        public async Task AddDirigent(Dirigent d)
+        {
+            _context.Dirigenten.Add(d);
+            await _context.SaveChangesAsync();
+        }
+        public async Task AddSolist(Solist s)
+        {
+            _context.Solisten.Add(s);
+            await _context.SaveChangesAsync();
         }
 
         // --- SPEZIFISCHE LOGIK (Bleibt wie sie ist) ---

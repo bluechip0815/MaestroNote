@@ -21,14 +21,7 @@
     @if (EditMusicRecord is not null)
     {
         <h3>Bearbeiten</h3>
-        @if (newItem)
-        {
-            <Note currentRecord="EditMusicRecord" CloseCallback="@CloseNote" />
-        }
-        else
-        {
-            <Edit currentRecord="EditMusicRecord" CloseCallback="@CloseNote" />
-        }
+        <Edit currentRecord="EditMusicRecord" CloseCallback="@CloseNote" />
     }
     else
     {
