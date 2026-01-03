@@ -91,31 +91,19 @@
                                 {
                                     @string.Join(", ", record.Werke.Select(w => w.Komponist?.Name ?? ""))
                                 }
-                                else
-                                {
-                                    @record.KomponistLegacy
-                                }
                             </td>
                             <td>
                                 @if (record.Werke.Any())
                                 {
                                     @string.Join(", ", record.Werke.Select(w => w.Name))
                                 }
-                                else
-                                {
-                                    @record.WerkLegacy
-                                }
                             </td>
-                            <td>@(record.Orchester?.Name ?? record.OrchesterLegacy)</td>
-                            <td>@(record.Dirigent?.Name ?? record.DirigentLegacy)</td>
+                            <td>@(record.Orchester?.Name)</td>
+                            <td>@(record.Dirigent?.Name)</td>
                             <td>
                                 @if (record.Solisten.Any())
                                 {
                                     @string.Join(", ", record.Solisten.Select(s => s.Name))
-                                }
-                                else
-                                {
-                                    @record.SolistLegacy
                                 }
                             </td>
                             <td>@record.Spielsaison </td>
@@ -148,7 +136,7 @@
                                     }
                                 </td>
                                 <td colspan="7" style="background-color:azure">
-                                    <pre>@(!string.IsNullOrEmpty(currentRecord1.Bewertung) ? currentRecord1.Bewertung : currentRecord1.Bewertung1Legacy)</pre>
+                                    <pre>@currentRecord1.Bewertung</pre>
                                 </td>
                             </tr>
                         }
