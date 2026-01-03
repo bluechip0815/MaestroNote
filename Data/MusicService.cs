@@ -10,7 +10,7 @@ namespace MaestroNotes.Data
             _context = context;
             try
             {
-                DefaultLists.Init(context);
+                //DefaultLists.Init(context);
                 Log.Logger.Information("MusicService constructed");
             }
             catch (Exception ex) 
@@ -214,5 +214,42 @@ namespace MaestroNotes.Data
             // ./Documents/
             return _context is not null ? _context.ImagesPath : "";
         }
+        // --- GENERISCHE METHODEN FÜR EINFACHE ENTITÄTEN ---
+        // Holt alle Einträge einer beliebigen Klasse (z.B. Komponisten)
+        //public async Task<List<T>> GetAllAsync<T>() where T : class
+        //{
+        //    return await _context.Set<T>().ToListAsync();
+        //}
+
+        // Findet einen Eintrag per ID
+        public async Task<T?> GetByIdAsync<T>(int id) where T : class
+        {
+            return await _context.Set<T>().FindAsync(id);
+        }
+
+        // Speichert oder aktualisiert (EF erkennt anhand der ID meist selbst, ob Add oder Update)
+        public async Task SaveAsync<T>(T entity) where T : class
+        {
+            _context.Update(entity); // Funktioniert für neue und bestehende Entities
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync<T>(int id) where T : class
+        {
+            var entity = await _context.Set<T>().FindAsync(id);
+            if (entity != null)
+            {
+                _context.Set<T>().Remove(entity);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        // --- SPEZIFISCHE LOGIK (Bleibt wie sie ist) ---
+
+        //public async Task<string> SaveFile(int pid, string FileName, byte[] fileBytes, DocumentType type)
+        //{
+        //    // ... Deine existierende Dateilogik ...
+        //}
+
     }
 }

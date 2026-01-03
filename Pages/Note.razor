@@ -13,16 +13,16 @@
             <select id="Komponist" class="form-control" @onchange="OnKomponistSelectionChanged">
                 <option value="">Komponist auswählen</option>
                 <option value="new">Anderer (neue Eingabe)</option>
-                @foreach (var komponist in DefaultLists.KomponistList)
+                @foreach (var komponist in Komponisten)
                 {
-                    <option value="@komponist">@komponist</option>
+                    <option value="@komponist.Id">@komponist.Name</option>
                 }
             </select>
             <!-- Conditional input for new item -->
             @if (isNewKomponist)
             {
-                <InputText id="NewKomponist" class="form-control" @bind-Value="currentRecord.Komponist" placeholder="Neuer Komponist" />
-                <ValidationMessage For="@(() => currentRecord.Komponist)" />
+                <InputText id="NewKomponist" class="form-control" @bind-Value="currentRecord.KomponistLegacy" placeholder="Neues Werk" />
+                <ValidationMessage For="@(() => currentRecord.KomponistLegacy)" />
             }
         </div>
         &nbsp;&nbsp;&nbsp;
@@ -32,16 +32,16 @@
             <select id="Werk" class="form-control" @onchange="OnWerkSelectionChanged">
                 <option value="">Werk auswählen</option>
                 <option value="new">Anderes (neue Eingabe)</option>
-                @foreach (var n in DefaultLists.WerkList)
+                @foreach (var n in Werke)
                 {
-                    <option value="@n">@n</option>
+                    <option value="@n.Name">@n.Name</option>
                 }
             </select>
             <!-- Conditional input for new item -->
             @if (isNewWerk)
             {
-                <InputText id="NewWerk" class="form-control" @bind-Value="currentRecord.Werk" placeholder="Neues Werk" />
-                <ValidationMessage For="@(() => currentRecord.Werk)" />
+                <InputText id="NewWerk" class="form-control" @bind-Value="currentRecord.WerkLegacy" placeholder="Neues Werk" />
+                <ValidationMessage For="@(() => currentRecord.WerkLegacy)" />
             }
 
         </div>
@@ -52,7 +52,7 @@
             <select id="Orchester" class="form-control" @onchange="OnOrchesterSelectionChanged">
                 <option value="">Orchester auswählen</option>
                 <option value="new">Anderes (neue Eingabe)</option>
-                @foreach (var n in DefaultLists.OrchesterList)
+                @foreach (var n in Orchester)
                 {
                     <option value="@n">@n</option>
                 }
@@ -60,7 +60,6 @@
             <!-- Conditional input for new item -->
             @if (isNewOrchester)
             {
-                <InputText id="NewOrchester" class="form-control" @bind-Value="currentRecord.Orchester" placeholder="Neues Orchester" />
                 <ValidationMessage For="@(() => currentRecord.Orchester)" />
             }
         </div>
@@ -72,15 +71,15 @@
             <select id="Dirigent" class="form-control" @onchange="OnDirigentSelectionChanged">
                 <option value="">Dirigent auswählen</option>
                 <option value="new">Anderer (neue Eingabe)</option>
-                @foreach (var n in DefaultLists.DirigentList)
+                @foreach (var n in Dirigenten)
                 {
-                    <option value="@n">@n</option>
+                    <option value="@n.Name">@n.Name</option>
                 }
             </select>
             <!-- Conditional input for new item -->
             @if (isNewDirigent)
             {
-                <InputText id="NewDirigent" class="form-control" @bind-Value="currentRecord.Dirigent" placeholder="Neuer Dirigent" />
+                <InputText id="NewDirigent" class="form-control" @bind-Value="currentRecord.DirigentLegacy" placeholder="Neuer Dirigent" />
                 <ValidationMessage For="@(() => currentRecord.Dirigent)" />
             }
         </div>
@@ -91,16 +90,16 @@
             <select id="Solist" class="form-control" @onchange="OnSolistSelectionChanged">
                 <option value="">Solist auswählen</option>
                 <option value="new">Anderer (neue Eingabe)</option>
-                @foreach (var n in DefaultLists.SolistList)
+                @foreach (var n in Solisten)
                 {
-                    <option value="@n">@n</option>
+                    <option value="@n.Name">@n.Name</option>
                 }
             </select>
             <!-- Conditional input for new item -->
             @if (isNewSolist)
             {
-                <InputText id="NewSolist" class="form-control" @bind-Value="currentRecord.Solist" placeholder="Neuer Solist" />
-                <ValidationMessage For="@(() => currentRecord.Solist)" />
+                <InputText id="NewSolist" class="form-control" @bind-Value="currentRecord.SolistLegacy" placeholder="Neuer Solist" />
+                <ValidationMessage For="@(() => currentRecord.SolistLegacy)" />
             }
         </div>
         &nbsp;&nbsp;&nbsp;
@@ -125,8 +124,8 @@
     </div>
     <div class="form-group">
         <label for="Bewertung1">Bewertung:</label>
-        <InputTextArea id="Bewertung1" class="form-control" @bind-Value="currentRecord.Bewertung1" rows="8" />
-        <ValidationMessage For="@(() => currentRecord.Bewertung1)" />
+        <InputTextArea id="Bewertung1" class="form-control" @bind-Value="currentRecord.Bewertung" rows="8" />
+        <ValidationMessage For="@(() => currentRecord.Bewertung)" />
     </div>
     <div style="display: flex;">
         <div class="form-group">
@@ -150,8 +149,8 @@
         &nbsp;&nbsp;&nbsp;
         <div class="form-group">
             <label for="Bewertung2">Notiz:</label>
-            <InputTextArea id="Bewertung2" class="form-control" @bind-Value="currentRecord.Bewertung2" />
-            <ValidationMessage For="@(() => currentRecord.Bewertung2)" />
+            <InputTextArea id="Bewertung2" class="form-control" @bind-Value="currentRecord.Bewertung2Legacy" />
+            <ValidationMessage For="@(() => currentRecord.Bewertung2Legacy)" />
         </div>
     </div>
     <div style="display: flex;">
@@ -169,14 +168,21 @@
 </EditForm>
 
 @code {
-    
     [Parameter]
     public MusicRecord currentRecord { get; set; } = new();
+    [Parameter]
+    public List<Komponist> Komponisten { get; set; } = new();
+    [Parameter]
+    public List<Dirigent> Dirigenten { get; set; } = new();
+    [Parameter]
+    public List<Werk> Werke{ get; set; } = new();
+    [Parameter]
+    public List<Solist> Solisten { get; set; } = new();
+    [Parameter]
+    public List<Orchester> Orchester { get; set; } = new();
 
     [Parameter]
     public EventCallback<bool> CloseCallback { get; set; }
-
-
     private void Close(bool result)
     {
         CloseCallback.InvokeAsync(result);
@@ -190,13 +196,13 @@
         {
             // Show text input for entering a new Komponist
             isNewKomponist = true;
-            currentRecord.Komponist = ""; // Clear the selected value
+            currentRecord.KomponistLegacy= ""; // Clear the selected value
         }
         else if (!string.IsNullOrEmpty(selectedValue))
         {
             // Hide text input and use the selected Komponist
             isNewKomponist = false;
-            currentRecord.Komponist = selectedValue;
+            currentRecord.KomponistLegacy = selectedValue;
         }
     }
     private bool isNewWerk = false;
@@ -208,13 +214,13 @@
         {
             // Show text input for entering a new Komponist
             isNewWerk = true;
-            currentRecord.Werk = ""; // Clear the selected value
+            currentRecord.WerkLegacy= ""; // Clear the selected value
         }
         else if (!string.IsNullOrEmpty(selectedValue))
         {
             // Hide text input and use the selected Komponist
             isNewWerk = false;
-            currentRecord.Werk = selectedValue;
+            currentRecord.WerkLegacy = selectedValue;
         }
     }
     private bool isNewOrchester = false;
@@ -226,13 +232,13 @@
         {
             // Show text input for entering a new Komponist
             isNewOrchester = true;
-            currentRecord.Orchester = ""; // Clear the selected value
+            currentRecord.OrchesterLegacy = ""; // Clear the selected value
         }
         else if (!string.IsNullOrEmpty(selectedValue))
         {
             // Hide text input and use the selected Komponist
             isNewOrchester = false;
-            currentRecord.Orchester = selectedValue;
+            currentRecord.OrchesterLegacy = selectedValue;
         }
     }
     private bool isNewDirigent = false;
@@ -244,13 +250,13 @@
         {
             // Show text input for entering a new Komponist
             isNewDirigent = true;
-            currentRecord.Dirigent = ""; // Clear the selected value
+            currentRecord.DirigentLegacy = ""; // Clear the selected value
         }
         else if (!string.IsNullOrEmpty(selectedValue))
         {
             // Hide text input and use the selected Komponist
             isNewDirigent = false;
-            currentRecord.Dirigent = selectedValue;
+            currentRecord.DirigentLegacy = selectedValue;
         }
     }
     private bool isNewSolist = false;
@@ -262,13 +268,13 @@
         {
             // Show text input for entering a new Komponist
             isNewSolist = true;
-            currentRecord.Solist = ""; // Clear the selected value
+            currentRecord.SolistLegacy = ""; // Clear the selected value
         }
         else if (!string.IsNullOrEmpty(selectedValue))
         {
             // Hide text input and use the selected Komponist
             isNewSolist = false;
-            currentRecord.Solist = selectedValue;
+            currentRecord.SolistLegacy = selectedValue;
         }
     }
     private bool isNewOrt = false;

@@ -10,7 +10,7 @@ namespace MaestroNotes.Data
         [MaxLength(200)]
         public string Name { get; set; } = "";
         [MaxLength(1000)]
-        public string Note { get; set; } = "";
+        public string? Note { get; set; }
 
         public int? KomponistId { get; set; }
         [ForeignKey("KomponistId")]
