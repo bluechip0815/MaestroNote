@@ -29,6 +29,54 @@ namespace MaestroNotes.Data
         {
             return _context.MusicRecords.ToList();
         }
+
+        public List<MusicRecordDisplayDto> GetDisplayRecords(string filter, int limit)
+        {
+            var query = _context.MusicRecords
+                .Include(m => m.Dirigent)
+                .Include(m => m.Orchester)
+                .Include(m => m.Werke).ThenInclude(w => w.Komponist)
+                .Include(m => m.Solisten)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(filter))
+            {
+                query = query.Where(m =>
+                    m.Bezeichnung.Contains(filter) ||
+                    m.Ort.Contains(filter) ||
+                    m.Spielsaison.Contains(filter) ||
+                    m.Bewertung.Contains(filter) ||
+                    (m.Dirigent != null && m.Dirigent.Name.Contains(filter)) ||
+                    (m.Orchester != null && m.Orchester.Name.Contains(filter)) ||
+                    m.Werke.Any(w => w.Name.Contains(filter) || (w.Komponist != null && w.Komponist.Name.Contains(filter))) ||
+                    m.Solisten.Any(s => s.Name.Contains(filter))
+                );
+            }
+
+            query = query.OrderByDescending(m => m.Datum);
+
+            if (limit > 0)
+            {
+                query = query.Take(limit);
+            }
+
+            var entities = query.ToList();
+
+            return entities.Select(m => new MusicRecordDisplayDto
+            {
+                Id = m.Id,
+                Datum = m.Datum,
+                Spielsaison = m.Spielsaison,
+                Ort = m.Ort,
+                Bewertung = m.Bewertung,
+                KomponistNames = string.Join(", ", m.Werke.Select(w => w.Komponist?.Name ?? "").Where(s => !string.IsNullOrEmpty(s))),
+                WerkNames = string.Join(", ", m.Werke.Select(w => w.Name)),
+                OrchesterName = m.Orchester?.Name ?? "",
+                DirigentName = m.Dirigent?.Name ?? "",
+                SolistNames = string.Join(", ", m.Solisten.Select(s => s.Name))
+            }).ToList();
+        }
+
         public async Task<bool> SaveDataSet(MusicRecord record)
         {
             try
@@ -64,7 +112,12 @@ namespace MaestroNotes.Data
         }
         public MusicRecord? GetRecordById(int id)
         {
-            return _context.MusicRecords.Find(id);
+            return _context.MusicRecords
+                .Include(m => m.Dirigent)
+                .Include(m => m.Orchester)
+                .Include(m => m.Werke).ThenInclude(w => w.Komponist)
+                .Include(m => m.Solisten)
+                .FirstOrDefault(m => m.Id == id);
         }
         public MusicRecord CreateNewRecord()
         {
