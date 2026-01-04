@@ -25,12 +25,85 @@
     }
     else
     {
-        <div class="flex-column">
-            <label>Suche (ab 3 Zeichen):</label>
-            <input type="text" id="search" size="10" @onchange="Filter" />
-            <span>&nbsp;&nbsp;&nbsp;</span>
-            @GetNumber() Datensätze
-            <span>&nbsp;&nbsp;&nbsp;</span>
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <select class="form-select" style="width: auto;" @bind="searchCategory">
+                @foreach (var cat in searchCategories)
+                {
+                    <option value="@cat">@cat</option>
+                }
+            </select>
+
+            @if (searchCategory == "Datum")
+            {
+                <span>von</span>
+                <input type="date" class="form-control" style="width: auto;" @bind="searchDateFrom" />
+                <span>bis</span>
+                <input type="date" class="form-control" style="width: auto;" @bind="searchDateTo" />
+            }
+            else if (searchCategory == "Note")
+            {
+                <input type="text" class="form-control" style="width: 200px;" @bind="searchTerm" placeholder="(* und ? möglich)" />
+            }
+            else
+            {
+                <select class="form-select" style="width: auto;" @bind="searchTerm">
+                    <option value="">Bitte wählen...</option>
+                    @if (searchCategory == "Werk")
+                    {
+                        @foreach (var item in availableWerke)
+                        {
+                            <option value="@item">@item</option>
+                        }
+                    }
+                    else if (searchCategory == "Komponist")
+                    {
+                        @foreach (var item in availableKomponisten)
+                        {
+                            <option value="@item">@item</option>
+                        }
+                    }
+                    else if (searchCategory == "Dirigent")
+                    {
+                        @foreach (var item in availableDirigenten)
+                        {
+                            <option value="@item">@item</option>
+                        }
+                    }
+                    else if (searchCategory == "Solist")
+                    {
+                        @foreach (var item in availableSolisten)
+                        {
+                            <option value="@item">@item</option>
+                        }
+                    }
+                    else if (searchCategory == "Orchester")
+                    {
+                        @foreach (var item in availableOrchester)
+                        {
+                            <option value="@item">@item</option>
+                        }
+                    }
+                    else if (searchCategory == "Ort")
+                    {
+                        @foreach (var item in availableOrte)
+                        {
+                            <option value="@item">@item</option>
+                        }
+                    }
+                    else if (searchCategory == "Saisson")
+                    {
+                        @foreach (var item in availableSaisons)
+                        {
+                            <option value="@item">@item</option>
+                        }
+                    }
+                </select>
+            }
+
+            <button class="btn btn-secondary" @onclick="RefreshList">Zeige</button>
+
+            <span>@GetNumber() Datensätze</span>
+
             <select id="number" value="@selectedLimit" @onchange="Display">
                 @foreach (var opt in limitOptions)
                 {
@@ -39,7 +112,6 @@
             </select>
             @if (PageEnabled == AccessType.ReadWrite)
             {
-                <span>&nbsp;&nbsp;&nbsp;</span>
                 <button class="small-button" @onclick="() => AddNew()">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -184,18 +256,55 @@ else
 @code {
     private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
     private int selectedLimit = 5;
-    private string currentFilter = "";
+
+    // Search properties
+    private List<string> searchCategories = new() { "Werk", "Komponist", "Dirigent", "Ort", "Solist", "Orchester", "Note", "Datum", "Saisson" };
+
+    private string _searchCategory = "Werk";
+    private string searchCategory
+    {
+        get => _searchCategory;
+        set
+        {
+            _searchCategory = value;
+            searchTerm = "";
+            searchDateFrom = null;
+            searchDateTo = null;
+        }
+    }
+
+    private string searchTerm = "";
+    private DateTime? searchDateFrom;
+    private DateTime? searchDateTo;
+
+    // Dropdown lists
+    private List<string> availableWerke = new();
+    private List<string> availableKomponisten = new();
+    private List<string> availableDirigenten = new();
+    private List<string> availableSolisten = new();
+    private List<string> availableOrchester = new();
+    private List<string> availableOrte = new();
+    private List<string> availableSaisons = new();
 
     private List<MusicRecordDisplayDto> MusicRecords = new();
 
     protected override void OnInitialized()
     {
+        // Load lists
+        availableWerke = Service.GetUsedWerkeNames();
+        availableKomponisten = Service.GetUsedKomponistenNames();
+        availableDirigenten = Service.GetUsedDirigentenNames();
+        availableSolisten = Service.GetUsedSolistenNames();
+        availableOrchester = Service.GetUsedOrchesterNames();
+        availableOrte = Service.GetUsedOrte();
+        availableSaisons = Service.GetUsedSaisons();
+
         RefreshList();
     }
 
     private void RefreshList()
     {
-        MusicRecords = Service.GetDisplayRecords(currentFilter, selectedLimit);
+        MusicRecords = Service.GetDisplayRecords(searchCategory, searchTerm, searchDateFrom, searchDateTo, selectedLimit);
     }
 
     private void Display(ChangeEventArgs a)
@@ -205,20 +314,6 @@ else
             selectedLimit = val;
             RefreshList();
         }
-    }
-
-    private void Filter(ChangeEventArgs a)
-    {
-        string? n = a?.Value?.ToString();
-        if (n is not null && n.Length >= 3)
-        {
-            currentFilter = n;
-        }
-        else
-        {
-            currentFilter = "";
-        }
-        RefreshList();
     }
 
     private string GetNumber()

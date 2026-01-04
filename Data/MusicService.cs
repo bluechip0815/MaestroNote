@@ -30,7 +30,7 @@ namespace MaestroNotes.Data
             return _context.MusicRecords.ToList();
         }
 
-        public List<MusicRecordDisplayDto> GetDisplayRecords(string filter, int limit)
+        public List<MusicRecordDisplayDto> GetDisplayRecords(string category, string searchTerm, DateTime? dateFrom, DateTime? dateTo, int limit)
         {
             var query = _context.MusicRecords
                 .Include(m => m.Dirigent)
@@ -39,18 +39,52 @@ namespace MaestroNotes.Data
                 .Include(m => m.Solisten)
                 .AsQueryable();
 
-            if (!string.IsNullOrEmpty(filter))
+            if (!string.IsNullOrEmpty(category))
             {
-                query = query.Where(m =>
-                    m.Bezeichnung.Contains(filter) ||
-                    m.Ort.Contains(filter) ||
-                    m.Spielsaison.Contains(filter) ||
-                    m.Bewertung.Contains(filter) ||
-                    (m.Dirigent != null && m.Dirigent.Name.Contains(filter)) ||
-                    (m.Orchester != null && m.Orchester.Name.Contains(filter)) ||
-                    m.Werke.Any(w => w.Name.Contains(filter) || (w.Komponist != null && w.Komponist.Name.Contains(filter))) ||
-                    m.Solisten.Any(s => s.Name.Contains(filter))
-                );
+                switch (category)
+                {
+                    case "Werk":
+                        if (!string.IsNullOrEmpty(searchTerm))
+                            query = query.Where(m => m.Werke.Any(w => w.Name == searchTerm));
+                        break;
+                    case "Komponist":
+                        if (!string.IsNullOrEmpty(searchTerm))
+                            query = query.Where(m => m.Werke.Any(w => w.Komponist != null && (w.Komponist.Name + (string.IsNullOrEmpty(w.Komponist.Vorname) ? "" : ", " + w.Komponist.Vorname)) == searchTerm));
+                        break;
+                    case "Dirigent":
+                        if (!string.IsNullOrEmpty(searchTerm))
+                            query = query.Where(m => m.Dirigent != null && (m.Dirigent.Name + (string.IsNullOrEmpty(m.Dirigent.Vorname) ? "" : ", " + m.Dirigent.Vorname)) == searchTerm);
+                        break;
+                    case "Solist":
+                        if (!string.IsNullOrEmpty(searchTerm))
+                            query = query.Where(m => m.Solisten.Any(s => (s.Name + (string.IsNullOrEmpty(s.Vorname) ? "" : ", " + s.Vorname)) == searchTerm));
+                        break;
+                    case "Orchester":
+                        if (!string.IsNullOrEmpty(searchTerm))
+                            query = query.Where(m => m.Orchester != null && m.Orchester.Name == searchTerm);
+                        break;
+                    case "Ort":
+                        if (!string.IsNullOrEmpty(searchTerm))
+                            query = query.Where(m => m.Ort == searchTerm);
+                        break;
+                    case "Saisson":
+                        if (!string.IsNullOrEmpty(searchTerm))
+                            query = query.Where(m => m.Spielsaison == searchTerm);
+                        break;
+                    case "Note":
+                        if (!string.IsNullOrEmpty(searchTerm))
+                        {
+                            string pattern = searchTerm.Replace("*", "%").Replace("?", "_");
+                            query = query.Where(m => EF.Functions.Like(m.Bewertung, pattern));
+                        }
+                        break;
+                    case "Datum":
+                        if (dateFrom.HasValue)
+                            query = query.Where(m => m.Datum >= dateFrom.Value);
+                        if (dateTo.HasValue)
+                            query = query.Where(m => m.Datum <= dateTo.Value);
+                        break;
+                }
             }
 
             query = query.OrderByDescending(m => m.Datum);
@@ -328,6 +362,78 @@ namespace MaestroNotes.Data
         {
             _context.Solisten.Add(s);
             await _context.SaveChangesAsync();
+        }
+
+        public List<string> GetUsedKomponistenNames()
+        {
+            return _context.MusicRecords
+                .SelectMany(m => m.Werke)
+                .Select(w => w.Komponist)
+                .Where(k => k != null)
+                .Select(k => k.Name + (string.IsNullOrEmpty(k.Vorname) ? "" : ", " + k.Vorname))
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList();
+        }
+
+        public List<string> GetUsedWerkeNames()
+        {
+            return _context.MusicRecords
+                .SelectMany(m => m.Werke)
+                .Select(w => w.Name)
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList();
+        }
+
+        public List<string> GetUsedOrchesterNames()
+        {
+            return _context.MusicRecords
+                .Where(m => m.Orchester != null)
+                .Select(m => m.Orchester.Name)
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList();
+        }
+
+        public List<string> GetUsedDirigentenNames()
+        {
+            return _context.MusicRecords
+                .Where(m => m.Dirigent != null)
+                .Select(m => m.Dirigent.Name + (string.IsNullOrEmpty(m.Dirigent.Vorname) ? "" : ", " + m.Dirigent.Vorname))
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList();
+        }
+
+        public List<string> GetUsedSolistenNames()
+        {
+            return _context.MusicRecords
+                .SelectMany(m => m.Solisten)
+                .Select(s => s.Name + (string.IsNullOrEmpty(s.Vorname) ? "" : ", " + s.Vorname))
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList();
+        }
+
+        public List<string> GetUsedOrte()
+        {
+            return _context.MusicRecords
+                .Select(m => m.Ort)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList();
+        }
+
+        public List<string> GetUsedSaisons()
+        {
+            return _context.MusicRecords
+                .Select(m => m.Spielsaison)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList();
         }
 
         // --- SPEZIFISCHE LOGIK (Bleibt wie sie ist) ---
