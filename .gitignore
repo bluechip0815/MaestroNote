@@ -52,3 +52,8 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+Properties/PublishProfiles/
+wwwroot/Documents/
+appsettings.Development.json
+MaestroNotes.csproj.user
+readme.txt
