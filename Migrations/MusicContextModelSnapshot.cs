@@ -17,10 +17,40 @@ namespace MaestroNotes.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.7")
+                .HasAnnotation("ProductVersion", "8.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+
+            modelBuilder.Entity("MaestroNotes.Data.Dirigent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("Born")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("Vorname")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Dirigenten");
+                });
 
             modelBuilder.Entity("MaestroNotes.Data.Document", b =>
                 {
@@ -51,6 +81,37 @@ namespace MaestroNotes.Migrations
                     b.ToTable("Documents");
                 });
 
+            modelBuilder.Entity("MaestroNotes.Data.Komponist", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("Born")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("Vorname")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Komponisten");
+                });
+
             modelBuilder.Entity("MaestroNotes.Data.MusicRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -59,57 +120,250 @@ namespace MaestroNotes.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Bewertung1")
+                    b.Property<string>("Bewertung")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
 
-                    b.Property<string>("Bewertung2")
+                    b.Property<string>("Bewertung1Legacy")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("Bewertung1");
+
+                    b.Property<string>("Bewertung2Legacy")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("Bewertung2");
+
+                    b.Property<string>("Bezeichnung")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
 
                     b.Property<DateTime>("Datum")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("Dirigent")
+                    b.Property<int?>("DirigentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DirigentLegacy")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("varchar(64)");
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("Dirigent");
 
-                    b.Property<string>("Komponist")
+                    b.Property<string>("KomponistLegacy")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("varchar(64)");
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("Komponist");
 
-                    b.Property<string>("Orchester")
+                    b.Property<int?>("OrchesterId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OrchesterLegacy")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("varchar(128)")
+                        .HasColumnName("Orchester");
 
                     b.Property<string>("Ort")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("varchar(64)");
 
-                    b.Property<string>("Solist")
+                    b.Property<string>("SolistLegacy")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("varchar(256)");
+                        .HasColumnType("varchar(256)")
+                        .HasColumnName("Solist");
 
                     b.Property<string>("Spielsaison")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("varchar(64)");
 
-                    b.Property<string>("Werk")
+                    b.Property<string>("WerkLegacy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("Werk");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DirigentId");
+
+                    b.HasIndex("OrchesterId");
+
+                    b.ToTable("MusicRecords");
+                });
+
+            modelBuilder.Entity("MaestroNotes.Data.Orchester", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("Founded")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
                     b.HasKey("Id");
 
-                    b.ToTable("MusicRecords");
+                    b.ToTable("Orchester");
+                });
+
+            modelBuilder.Entity("MaestroNotes.Data.Solist", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("Born")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("Vorname")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Solisten");
+                });
+
+            modelBuilder.Entity("MaestroNotes.Data.Werk", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("KomponistId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KomponistId");
+
+                    b.ToTable("Werke");
+                });
+
+            modelBuilder.Entity("MusicRecordSolist", b =>
+                {
+                    b.Property<int>("MusicRecordsId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SolistenId")
+                        .HasColumnType("int");
+
+                    b.HasKey("MusicRecordsId", "SolistenId");
+
+                    b.HasIndex("SolistenId");
+
+                    b.ToTable("MusicRecordSolist");
+                });
+
+            modelBuilder.Entity("MusicRecordWerk", b =>
+                {
+                    b.Property<int>("MusicRecordsId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WerkeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("MusicRecordsId", "WerkeId");
+
+                    b.HasIndex("WerkeId");
+
+                    b.ToTable("MusicRecordWerk");
+                });
+
+            modelBuilder.Entity("MaestroNotes.Data.MusicRecord", b =>
+                {
+                    b.HasOne("MaestroNotes.Data.Dirigent", "Dirigent")
+                        .WithMany()
+                        .HasForeignKey("DirigentId");
+
+                    b.HasOne("MaestroNotes.Data.Orchester", "Orchester")
+                        .WithMany()
+                        .HasForeignKey("OrchesterId");
+
+                    b.Navigation("Dirigent");
+
+                    b.Navigation("Orchester");
+                });
+
+            modelBuilder.Entity("MaestroNotes.Data.Werk", b =>
+                {
+                    b.HasOne("MaestroNotes.Data.Komponist", "Komponist")
+                        .WithMany()
+                        .HasForeignKey("KomponistId");
+
+                    b.Navigation("Komponist");
+                });
+
+            modelBuilder.Entity("MusicRecordSolist", b =>
+                {
+                    b.HasOne("MaestroNotes.Data.MusicRecord", null)
+                        .WithMany()
+                        .HasForeignKey("MusicRecordsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MaestroNotes.Data.Solist", null)
+                        .WithMany()
+                        .HasForeignKey("SolistenId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRecordWerk", b =>
+                {
+                    b.HasOne("MaestroNotes.Data.MusicRecord", null)
+                        .WithMany()
+                        .HasForeignKey("MusicRecordsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MaestroNotes.Data.Werk", null)
+                        .WithMany()
+                        .HasForeignKey("WerkeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

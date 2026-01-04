@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MaestroNotes.Data
 {
@@ -6,50 +7,69 @@ namespace MaestroNotes.Data
     {
         [Key]
         public int Id { get; set; } = 0;
-        [MaxLength(64)]
-        public string Komponist { get; set; } = "";
-        [MaxLength(100)]
-        public string Werk { get; set; } = "";
-        [MaxLength(128)]
-        public string Orchester { get; set; } = "";
-        [MaxLength(64)]
-        public string Dirigent { get; set; } = "";
-        [MaxLength(256)]
-        public string Solist { get; set; } = "";
+
+        [MaxLength(200)]
+        public string Bezeichnung { get; set; } = "";
+
         public DateTime Datum { get; set; } = DateTime.Now;
         [MaxLength(64)]
         public string Spielsaison { get; set; } = $"{DateTime.Now.Year}/{(DateTime.Now.Year+1)%100}";
-        [MaxLength(1000)]
-        public string Bewertung1 { get; set; } = "";
-        [MaxLength(1000)]
-        public string Bewertung2 { get; set; } = "";
+
+        [MaxLength(2000)]
+        public string Bewertung { get; set; } = "";
+
         [MaxLength(64)]
         public string Ort { get; set; } = "";
+
+        // Relationships
+        public int? DirigentId { get; set; }
+        [ForeignKey("DirigentId")]
+        public Dirigent? Dirigent { get; set; }
+
+        public int? OrchesterId { get; set; }
+        [ForeignKey("OrchesterId")]
+        public Orchester? Orchester { get; set; }
+
+        public List<Werk> Werke { get; set; } = new();
+
+        public List<Solist> Solisten { get; set; } = new();
+
+
         public void Init(MusicRecord n)
         {
             Id = n.Id;
-            Komponist = n.Komponist;
-            Werk = n.Werk;
-            Orchester = n.Orchester;
+            Bezeichnung = n.Bezeichnung;
+
             Dirigent = n.Dirigent;
-            Solist = n.Solist;
+            DirigentId = n.DirigentId;
+
+            Orchester = n.Orchester;
+            OrchesterId = n.OrchesterId;
+
+            Werke = n.Werke;
+            Solisten = n.Solisten;
+
             Datum = n.Datum;
-            Bewertung1 = n.Bewertung1;
-            Bewertung2 = n.Bewertung2;
+            Bewertung = n.Bewertung;
             Ort = n.Ort;
-            Spielsaison = n.Spielsaison;   
+            Spielsaison = n.Spielsaison;
         }
+
         public bool Find(string filter)
         {
-            if (Komponist.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Werk.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Orchester.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Dirigent.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Solist.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Spielsaison.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Bewertung1.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Bewertung2.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
+            // Search in new fields
+            if (Bezeichnung.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
             if (Ort.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
+            if (Spielsaison.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
+            if (Bewertung.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
+
+            // Search in linked entities
+            if (Dirigent?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
+            if (Orchester?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
+            if (Werke.Any(w => w.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
+                            || (w.Komponist?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true))) return true;
+            if (Solisten.Any(s => s.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase))) return true;
+
             return false;
         }
     }

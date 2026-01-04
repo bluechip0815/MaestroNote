@@ -1,93 +1,272 @@
-﻿@using System.ComponentModel.DataAnnotations
+@using System.ComponentModel.DataAnnotations
 @using MaestroNotes.Data
 @inject MusicService Service
 
 <EditForm Model="@currentRecord">
     <DataAnnotationsValidator />
     <ValidationSummary />
-    
-    <div style="display: flex;">
-        <div class="form-group">
-            <label for="Komponist">Komponist:</label>     
-            <InputText id="Komponist" class="form-control" @bind-Value="currentRecord.Komponist" />
-            <ValidationMessage For="@(() => currentRecord.Komponist)" />
+
+    <!-- ORCHESTER -->
+    <div class="form-group row">
+        <label class="col-sm-2 col-form-label">Orchester:</label>
+        <div class="col-sm-8">
+            <select class="form-control" @bind="currentRecord.OrchesterId">
+                <option value="">(None)</option>
+                @foreach (var o in OrchesterList)
+                {
+                    <option value="@o.Id">@o.Name</option>
+                }
+            </select>
         </div>
-        &nbsp;&nbsp;&nbsp;
-        <div class="form-group">
-            <label for="Werk">Werk:</label>
-            <InputText id="Werk" class="form-control" @bind-Value="currentRecord.Werk" />
-            <ValidationMessage For="@(() => currentRecord.Werk)" />
-        </div>
-        &nbsp;&nbsp;&nbsp;
-        <div class="form-group">
-            <label for="Orchester">Orchester:</label>
-            <InputText id="Orchester" class="form-control" @bind-Value="currentRecord.Orchester" />
-            <ValidationMessage For="@(() => currentRecord.Orchester)" />
-        </div>
-    </div>
-    <div style="display: flex;">
-        <div class="form-group">
-            <label for="Dirigent">Dirigent:</label>
-            <InputText id="Dirigent" class="form-control" @bind-Value="currentRecord.Dirigent" />
-            <ValidationMessage For="@(() => currentRecord.Dirigent)" />
-        </div>
-        &nbsp;&nbsp;&nbsp;
-        <div class="form-group">
-            <label for="Solist">Solist:</label>
-            <InputText id="Solist" class="form-control" @bind-Value="currentRecord.Solist" />
-            <ValidationMessage For="@(() => currentRecord.Solist)" />
-        </div>
-        &nbsp;&nbsp;&nbsp;
-        <div class="form-group">
-            <label for="Ort">Ort:</label>
-            <InputText id="Ort" class="form-control" @bind-Value="currentRecord.Ort" />
-            <ValidationMessage For="@(() => currentRecord.Ort)" />
+        <div class="col-sm-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewOrchester = true">
+                <i class="fas fa-plus"></i>
+            </button>
         </div>
     </div>
-    <div class="form-group">
-        <label for="Bewertung1">Bewertung:</label>
-        <InputTextArea id="Bewertung1" class="form-control" @bind-Value="currentRecord.Bewertung1" rows="8" />
-        <ValidationMessage For="@(() => currentRecord.Bewertung1)" />
+
+    <!-- DIRIGENT -->
+    <div class="form-group row mt-2">
+        <label class="col-sm-2 col-form-label">Dirigent:</label>
+        <div class="col-sm-8">
+            <select class="form-control" @bind="currentRecord.DirigentId">
+                <option value="">(None)</option>
+                @foreach (var d in DirigentenList)
+                {
+                    <option value="@d.Id">@d.Name, @d.Vorname</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewDirigent = true">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
     </div>
-    <div style="display: flex;">
-        <div class="form-group">
+
+    <!-- WERKE -->
+    <div class="form-group mt-2">
+        <label>Werke:</label>
+        <table class="table table-sm table-bordered">
+            <tbody>
+                @foreach (var w in currentRecord.Werke)
+                {
+                    <tr>
+                        <td>@w.Name (@(w.Komponist?.Name ?? "Unbekannt"))</td>
+                        <td style="width: 50px;">
+                            <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveWerk(w)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="row">
+            <div class="col-sm-8">
+                <select class="form-control" @bind="selectedWerkToAddId">
+                    <option value="">Werk auswählen...</option>
+                    @foreach (var w in WerkeList)
+                    {
+                        <option value="@w.Id">@w.Name (@(w.Komponist?.Name ?? "Unbekannt"))</option>
+                    }
+                </select>
+            </div>
+            <div class="col-sm-2">
+                <button type="button" class="btn btn-sm btn-secondary" @onclick="AddSelectedWerk">Hinzufügen</button>
+            </div>
+            <div class="col-sm-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewWerk = true">
+                    <i class="fas fa-plus"></i> Neu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SOLISTEN -->
+    <div class="form-group mt-2">
+        <label>Solisten:</label>
+        <table class="table table-sm table-bordered">
+            <tbody>
+                @foreach (var s in currentRecord.Solisten)
+                {
+                    <tr>
+                        <td>@s.Name, @s.Vorname</td>
+                        <td style="width: 50px;">
+                            <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveSolist(s)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="row">
+            <div class="col-sm-8">
+                <select class="form-control" @bind="selectedSolistToAddId">
+                    <option value="">Solist auswählen...</option>
+                    @foreach (var s in SolistenList)
+                    {
+                        <option value="@s.Id">@s.Name, @s.Vorname</option>
+                    }
+                </select>
+            </div>
+            <div class="col-sm-2">
+                <button type="button" class="btn btn-sm btn-secondary" @onclick="AddSelectedSolist">Hinzufügen</button>
+            </div>
+            <div class="col-sm-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewSolist = true">
+                    <i class="fas fa-plus"></i> Neu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OTHER FIELDS -->
+    <div class="form-group mt-3">
+        <label for="Ort">Ort:</label>
+        <InputText id="Ort" class="form-control" @bind-Value="currentRecord.Ort" />
+        <ValidationMessage For="@(() => currentRecord.Ort)" />
+    </div>
+
+    <div class="form-group mt-2">
+        <label for="Bewertung">Bewertung:</label>
+        <InputTextArea id="Bewertung" class="form-control" @bind-Value="currentRecord.Bewertung" rows="5" />
+        <ValidationMessage For="@(() => currentRecord.Bewertung)" />
+    </div>
+
+    <div class="row mt-2">
+        <div class="col-md-6 form-group">
             <label for="Spielsaison">Spielsaison:</label>
             <select id="Spielsaison" class="form-control" @bind="currentRecord.Spielsaison">
-            @foreach(string n in DefaultLists.SpielSaisonList)
-            {
-                @if (n!="")
+                @foreach(string n in DefaultLists.SpielSaisonList)
                 {
-                    <option value="@n">@n</option>
+                    if (n!="")
+                    {
+                        <option value="@n">@n</option>
+                    }
                 }
-            }
             </select>
             <ValidationMessage For="@(() => currentRecord.Spielsaison)" />
         </div>
-        &nbsp;&nbsp;&nbsp;
-        <div class="form-group">
+        <div class="col-md-6 form-group">
             <label for="Datum">Datum:</label>
             <InputDate id="Datum" class="form-control" @bind-Value="currentRecord.Datum" />
         </div>
-        &nbsp;&nbsp;&nbsp;
-        <div class="form-group">
-            <label for="Bewertung2">Notiz:</label>
-            <InputTextArea id="Bewertung2" class="form-control" @bind-Value="currentRecord.Bewertung2" />
-            <ValidationMessage For="@(() => currentRecord.Bewertung2)" />
-        </div>
     </div>
-    <div style="display: flex;">
-        <div class="flex-column">
-        <br />            
-            <button class="small-button" @onclick="() => Close(true)">
-                <i class="fas fa-save"></i>
-            </button>
-            &nbsp;&nbsp;&nbsp;
-            <button class="small-button" @onclick="() => Close(false)">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
+
+    <!-- ACTIONS -->
+    <div class="mt-4">
+        <button type="button" class="btn btn-success" @onclick="() => Close(true)">
+            <i class="fas fa-save"></i> Speichern
+        </button>
+        <button type="button" class="btn btn-secondary ms-2" @onclick="() => Close(false)">
+            <i class="fas fa-times"></i> Abbrechen
+        </button>
     </div>
+
 </EditForm>
+
+<!-- MODALS (Simple overlays) -->
+@if (showNewOrchester)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Neues Orchester</h5>
+                    <button type="button" class="btn-close" @onclick="() => showNewOrchester = false"></button>
+                </div>
+                <div class="modal-body">
+                    <input class="form-control" placeholder="Name" @bind="newOrchester.Name" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showNewOrchester = false">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveNewOrchester">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showNewDirigent)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Neuer Dirigent</h5>
+                    <button type="button" class="btn-close" @onclick="() => showNewDirigent = false"></button>
+                </div>
+                <div class="modal-body">
+                    <input class="form-control mb-2" placeholder="Vorname" @bind="newDirigent.Vorname" />
+                    <input class="form-control" placeholder="Name" @bind="newDirigent.Name" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showNewDirigent = false">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveNewDirigent">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showNewSolist)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Neuer Solist</h5>
+                    <button type="button" class="btn-close" @onclick="() => showNewSolist = false"></button>
+                </div>
+                <div class="modal-body">
+                    <input class="form-control mb-2" placeholder="Vorname" @bind="newSolist.Vorname" />
+                    <input class="form-control" placeholder="Name" @bind="newSolist.Name" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showNewSolist = false">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveNewSolist">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showNewWerk)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Neues Werk</h5>
+                    <button type="button" class="btn-close" @onclick="() => showNewWerk = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label>Komponist (erforderlich):</label>
+                        <select class="form-control" @bind="newWerk.KomponistId">
+                            <option value="">Bitte wählen...</option>
+                            @foreach (var k in KomponistenList)
+                            {
+                                <option value="@k.Id">@k.Name, @k.Vorname</option>
+                            }
+                        </select>
+                    </div>
+                    <input class="form-control" placeholder="Werk Name" @bind="newWerk.Name" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showNewWerk = false">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveNewWerk">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter]
@@ -96,8 +275,145 @@
     [Parameter]
     public EventCallback<bool> CloseCallback { get; set; }
 
+    // Lists
+    private List<Orchester> OrchesterList = new();
+    private List<Dirigent> DirigentenList = new();
+    private List<Solist> SolistenList = new();
+    private List<Werk> WerkeList = new();
+    private List<Komponist> KomponistenList = new();
+
+    // UI State for Modals
+    private bool showNewOrchester = false;
+    private bool showNewDirigent = false;
+    private bool showNewSolist = false;
+    private bool showNewWerk = false;
+
+    // Temporary objects for creation
+    private Orchester newOrchester = new();
+    private Dirigent newDirigent = new();
+    private Solist newSolist = new();
+    private Werk newWerk = new();
+
+    // Selection State for Add to List
+    private int selectedWerkToAddId;
+    private int selectedSolistToAddId;
+
+    protected override void OnInitialized()
+    {
+        LoadLists();
+    }
+
+    private void LoadLists()
+    {
+        OrchesterList = Service.GetAllOrchester();
+        DirigentenList = Service.GetAllDirigenten();
+        SolistenList = Service.GetAllSolisten();
+        WerkeList = Service.GetAllWerke();
+        KomponistenList = Service.GetAllKomponisten();
+    }
+
     private void Close(bool result)
     {
         CloseCallback.InvokeAsync(result);
+    }
+
+    // --- Save Helpers ---
+
+    private async Task SaveNewOrchester()
+    {
+        if (!string.IsNullOrWhiteSpace(newOrchester.Name))
+        {
+            await Service.AddOrchester(newOrchester);
+            LoadLists();
+            // Auto-select the new one
+            currentRecord.OrchesterId = newOrchester.Id;
+            newOrchester = new(); // Reset
+            showNewOrchester = false;
+        }
+    }
+
+    private async Task SaveNewDirigent()
+    {
+        if (!string.IsNullOrWhiteSpace(newDirigent.Name))
+        {
+            await Service.AddDirigent(newDirigent);
+            LoadLists();
+            // Auto-select
+            currentRecord.DirigentId = newDirigent.Id;
+            newDirigent = new();
+            showNewDirigent = false;
+        }
+    }
+
+    private async Task SaveNewSolist()
+    {
+        if (!string.IsNullOrWhiteSpace(newSolist.Name))
+        {
+            await Service.AddSolist(newSolist);
+            LoadLists();
+            // Auto-add to list? Or just make available?
+            // Let's add it to the current record directly as a convenience
+            // Note: EF might get confused if we add the same instance from context A to context B,
+            // but here we are just adding to the list.
+            // Ideally we reload the object from the list we just fetched.
+            var created = SolistenList.FirstOrDefault(s => s.Id == newSolist.Id);
+            if (created != null)
+            {
+                currentRecord.Solisten.Add(created);
+            }
+
+            newSolist = new();
+            showNewSolist = false;
+        }
+    }
+
+    private async Task SaveNewWerk()
+    {
+        if (!string.IsNullOrWhiteSpace(newWerk.Name) && newWerk.KomponistId != null)
+        {
+            await Service.AddWerk(newWerk);
+            LoadLists();
+
+            var created = WerkeList.FirstOrDefault(w => w.Id == newWerk.Id);
+            if (created != null)
+            {
+                currentRecord.Werke.Add(created);
+            }
+
+            newWerk = new();
+            showNewWerk = false;
+        }
+    }
+
+    // --- List Management ---
+
+    private void AddSelectedWerk()
+    {
+        var werk = WerkeList.FirstOrDefault(w => w.Id == selectedWerkToAddId);
+        if (werk != null && !currentRecord.Werke.Any(w => w.Id == werk.Id))
+        {
+            currentRecord.Werke.Add(werk);
+        }
+        selectedWerkToAddId = 0; // Reset dropdown
+    }
+
+    private void RemoveWerk(Werk w)
+    {
+        currentRecord.Werke.Remove(w);
+    }
+
+    private void AddSelectedSolist()
+    {
+        var solist = SolistenList.FirstOrDefault(s => s.Id == selectedSolistToAddId);
+        if (solist != null && !currentRecord.Solisten.Any(s => s.Id == solist.Id))
+        {
+            currentRecord.Solisten.Add(solist);
+        }
+        selectedSolistToAddId = 0;
+    }
+
+    private void RemoveSolist(Solist s)
+    {
+        currentRecord.Solisten.Remove(s);
     }
 }

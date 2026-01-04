@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 
 @using Microsoft.AspNetCore.Components.Web
 @using MaestroNotes.Data
@@ -21,14 +21,7 @@
     @if (EditMusicRecord is not null)
     {
         <h3>Bearbeiten</h3>
-        @if (newItem)
-        {
-            <Note currentRecord="EditMusicRecord" CloseCallback="@CloseNote" />
-        }
-        else
-        {
-            <Edit currentRecord="EditMusicRecord" CloseCallback="@CloseNote" />
-        }
+        <Edit currentRecord="EditMusicRecord" CloseCallback="@CloseNote" />
     }
     else
     {
@@ -38,16 +31,16 @@
             <span>&nbsp;&nbsp;&nbsp;</span>
             @GetNumber() Datensätze
             <span>&nbsp;&nbsp;&nbsp;</span>
-            <select id="number" @onchange="Display">
-                @foreach (string n in listOrder)
+            <select id="number" value="@selectedLimit" @onchange="Display">
+                @foreach (var opt in limitOptions)
                 {
-                    <option value="@n">@n</option>
+                    <option value="@opt.Key">@opt.Value</option>
                 }
             </select>
             @if (PageEnabled == AccessType.ReadWrite)
             {
                 <span>&nbsp;&nbsp;&nbsp;</span>
-                <button class="small-button" @onclick="() => AddNew(null)">
+                <button class="small-button" @onclick="() => AddNew()">
                     <i class="fas fa-cog"></i>
                 </button>
             }
@@ -65,114 +58,113 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var record in GetRecords())
+                @foreach (var record in MusicRecords)
                 {
-                    @if (filter == "" || record.Find(filter))
+                    <tr>
+                        <td>
+                            <div class="button-container">
+                                <!-- Main content -->
+                                <button class="small-button" @onclick="() => Show1(record)">
+                                    <i class="fas fa-envelope"></i>
+                                </button>
+                                <button class="small-button" @onclick="() => Show2(record)">
+                                    <i class="fas fa-home"></i>
+                                </button>
+                            </div>
+                            @if (PageEnabled == AccessType.ReadWrite)
+                            {
+                                <div class="button-container">
+                                    <!-- Main content -->
+                                    <button class="small-button" @onclick="() => Upload(record)">
+                                        <i class="fas fa-upload"></i>
+                                    </button>
+                                    <button class="small-button" @onclick="() => Delete(record)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            }
+                        </td>
+                        <td>@record.KomponistNames</td>
+                        <td>@record.WerkNames</td>
+                        <td>@record.OrchesterName</td>
+                        <td>@record.DirigentName</td>
+                        <td>@record.SolistNames</td>
+                        <td>@record.Spielsaison</td>
+                    </tr>
+                    @if (DeleteRecordId == record.Id)
+                    {
+                        <tr>
+                            <td colspan="8" style="background-color:lightpink">
+                                <Delete CloseDeleteCallback="@CloseDeleteCallback" />
+                            </td>
+                        </tr>
+                    }
+                    @if (UploadRecordId == record.Id)
+                    {
+                        <tr>
+                            <td colspan="8" style="background-color:lightcyan">
+                                <Upload currentRecord="@UploadMusicRecord" CloseUploadCallback="@CloseUploadCallback" />
+                            </td>
+                        </tr>
+                    }
+                    @if (currentRecord1 == record)
                     {
                         <tr>
                             <td>
-                                <div class="button-container">
-                                    <!-- Main content -->
-                                    <button class="small-button" @onclick="() => Show1(record)">
-                                        <i class="fas fa-envelope"></i>
-                                    </button>
-                                    <button class="small-button" @onclick="() => Show2(record)">
-                                        <i class="fas fa-home"></i>
-                                    </button>
-                                </div>
                                 @if (PageEnabled == AccessType.ReadWrite)
                                 {
-                                    <div class="button-container">
-                                        <!-- Main content -->
-                                        <button class="small-button" @onclick="() => Upload(record)">
-                                            <i class="fas fa-upload"></i>
-                                        </button>
-                                        <button class="small-button" @onclick="() => Delete(record)">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
+                                    <button class="small-button" @onclick="() => Edit(record.Id)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
                                 }
                             </td>
-                            <td>@record.Komponist</td>
-                            <td>@record.Werk</td>
-                            <td>@record.Orchester</td>
-                            <td>@record.Dirigent</td>
-                            <td>@record.Solist</td>
-                            <td>@record.Spielsaison </td>
+                            <td colspan="7" style="background-color:azure">
+                                <pre>@currentRecord1.Bewertung</pre>
+                            </td>
                         </tr>
-                        @if (DeleteMusicRecord == record)
-                        {
-                            <tr>
-                                <td colspan="8" style="background-color:lightpink">
-                                    <Delete CloseDeleteCallback="@CloseDeleteCallback" />
-                                </td>
-                            </tr>
-                        }
-                        @if (UploadMusicRecord == record)
-                        {
-                            <tr>
-                                <td colspan="8" style="background-color:lightcyan">
-                                    <Upload currentRecord="@UploadMusicRecord" CloseUploadCallback="@CloseUploadCallback" />
-                                </td>
-                            </tr>
-                        }
-                        @if (currentRecord1 == record)
-                        {
-                            <tr>
-                                <td>
-                                    @if (PageEnabled == AccessType.ReadWrite)
+                    }
+                    @if (currentRecord2 == record)
+                    {
+                        <tr>
+                            <td>
+                                @if (PageEnabled == AccessType.ReadWrite)
+                                {
+                                    <button class="small-button" @onclick="() => Edit(record.Id)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                }
+                            </td>
+                            <td colspan="7" style="background-color:azure">
+                                <p>
+                                    [@currentRecord2.Id]
+                                    &nbsp;
+                                    &nbsp;
+                                    &nbsp;
+                                    @currentRecord2.Ort (@currentRecord2.Datum.ToString("yyyy-MM-dd"))
+                                </p>
+                                @if (Service.HasDocuments(currentRecord2.Id))
+                                {
+                                    @foreach (DOC item in Service.GetDocuments(currentRecord2.Id))
                                     {
-                                        <button class="small-button" @onclick="() => Edit(record)">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
+                                        <p>
+                                            <a href="@item.path" target="_blank">@item.fn</a>
+                                            <button class="small-button" @onclick="() => DeleteFile(item.id)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </p>
                                     }
-                                </td>
-                                <td colspan="7" style="background-color:azure">@currentRecord1.Bewertung1</td>
-                            </tr>
-                        }
-                        @if (currentRecord2 == record)
-                        {
-                            <tr>
-                                <td>
-                                    @if (PageEnabled == AccessType.ReadWrite)
+                                    @foreach (DOC item in Service.GetImages(currentRecord2.Id))
                                     {
-                                        <button class="small-button" @onclick="() => Edit(record)">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
+                                        <p>
+                                            <img src="@item.path" alt="@item.fn" width="600px" />
+                                            <button class="small-button" @onclick="() => DeleteFile(item.id)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </p>
                                     }
-                                </td>
-                                <td colspan="7" style="background-color:azure">
-                                    <p>
-                                        [@currentRecord2.Id]
-                                        &nbsp;
-                                        &nbsp;
-                                        &nbsp;
-                                        @currentRecord2.Ort (@currentRecord2.Datum.ToString("yyyy-MM-dd"))
-                                    </p>
-                                    @if (Service.HasDocuments(currentRecord2.Id))
-                                    {
-                                        @foreach (DOC item in Service.GetDocuments(currentRecord2.Id))
-                                        {
-                                            <p>
-                                                <a href="@item.path" target="_blank">@item.fn</a>
-                                                <button class="small-button" @onclick="() => DeleteFile(item.id)">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </p>
-                                        }
-                                        @foreach (DOC item in Service.GetImages(currentRecord2.Id))
-                                        {
-                                            <p>
-                                                <img src="@item.path" alt="@item.fn" width="600px" />
-                                                <button class="small-button" @onclick="() => DeleteFile(item.id)">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </p>
-                                        }
-                                    }
-                                </td>
-                            </tr>
-                        }
+                                }
+                            </td>
+                        </tr>
                     }
                 }
             </tbody>
@@ -190,44 +182,48 @@ else
 }
 
 @code {
-    private string[] listOrder = ["All", "Top 3", "Letzte 3"];
-    private int listedItems = 0;
+    private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
+    private int selectedLimit = 5;
+    private string currentFilter = "";
+
+    private List<MusicRecordDisplayDto> MusicRecords = new();
+
+    protected override void OnInitialized()
+    {
+        RefreshList();
+    }
+
+    private void RefreshList()
+    {
+        MusicRecords = Service.GetDisplayRecords(currentFilter, selectedLimit);
+    }
+
     private void Display(ChangeEventArgs a)
     {
-        if (a is not null && a.Value is not null)
+        if (int.TryParse(a?.Value?.ToString(), out int val))
         {
-            string? n = a.Value.ToString() ?? "";
-            for (int i = 0; i < listOrder.Length; i++)
-            {
-                if (n == listOrder[i])
-                {
-                    listedItems = i;
-                    break;
-                }
-            }
-            StateHasChanged();
+            selectedLimit = val;
+            RefreshList();
         }
     }
 
-    private List<MusicRecord> GetRecords()
+    private void Filter(ChangeEventArgs a)
     {
-        List<MusicRecord> records = new();
-        foreach (MusicRecord r in MusicRecords)
+        string? n = a?.Value?.ToString();
+        if (n is not null && n.Length >= 3)
         {
-            if (filter == "" || r.Find(filter))
-                records.Add(r);
+            currentFilter = n;
         }
-        if (listedItems > 0)
+        else
         {
-            while (records.Count > 3)
-            {
-                if (listedItems == 1)
-                    records.RemoveAt(records.Count - 1);
-                else
-                    records.RemoveAt(0);
-            }
+            currentFilter = "";
         }
-        return records;
+        RefreshList();
+    }
+
+    private string GetNumber()
+    {
+        return MusicRecords.Count.ToString();
     }
 
     private AccessType PageEnabled = AccessType.None;
@@ -243,183 +239,142 @@ else
             }
         }
     }
-    private string GetNumber()
-    {
-        int cnt = 0;
-        foreach (var record in MusicRecords)
-        {
-            if (filter == "" || record.Find(filter))
-                cnt++;
-        }
-        return cnt.ToString();
-    }
-    private async Task CloseUploadCallback()
-    {
-        if (UploadMusicRecord is not null)
-        {
-            await Task.Run(() => UploadMusicRecord = null);
-            StateHasChanged();
-        }
-    }
-    private async Task CloseDeleteCallback(bool del)
-    {
-        if (del && DeleteMusicRecord is not null)
-        {
-            await Service.DeleteDataSet(DeleteMusicRecord.Id);
-            MusicRecords = Service.GetAllMusicRecords();
-            StateHasChanged();
-        }
-        DeleteMusicRecord = null;
-    }
-    private MusicRecord? EditMusicRecord;
-    private bool newItem = false;
-    private void AddNew(MusicRecord? n)
-    {
-        if (n is null)
-        {
-            newItem = true;
-            EditMusicRecord = new();
-            //EditMusicRecord.Init(n);
-        }
-    }
-    private void Edit(MusicRecord? n)
-    {
-        if (EditMusicRecord is null)
-        {
-            newItem = false;
-            currentRecord1 = null;
-            currentRecord2 = null;
-            EditMusicRecord = n;
-        }
-    }
-    private async Task CloseNote(bool result)
-    {
-        if (result && EditMusicRecord is not null)
-            await Save(EditMusicRecord);
-        EditMusicRecord = null;
-    }
-    private async Task Save(MusicRecord? n)
-    {
-        if (EditMusicRecord is null)
-            return;
 
-        await Service.SaveDataSet(EditMusicRecord);
-        EditMusicRecord = null;
-        MusicRecords = Service.GetAllMusicRecords();
-        StateHasChanged();
-    }
+    // --- Detail Views ---
+    private MusicRecordDisplayDto? currentRecord1 = null;
+    private MusicRecordDisplayDto? currentRecord2 = null;
 
-    private string filter = "";
-    private void Filter(ChangeEventArgs a)
-    {
-        if (a is not null && a.Value is not null)
-        {
-            string? n = a.Value.ToString();
-            if (n is not null)
-            {
-                if (n.Length >= 3)
-                {
-                    filter = n;
-                    StateHasChanged();
-                    return;
-                }
-            }
-        }
-        filter = "";
-        StateHasChanged();
-    }
-    private MusicRecord? currentRecord1 = null;
-    private MusicRecord? currentRecord2 = null;
-    private MusicRecord? UploadMusicRecord = null;
-    private MusicRecord? DeleteMusicRecord = null;
-    private void Delete(MusicRecord? n)
-    {
-        if (DeleteMusicRecord is null)
-        {
-            DeleteMusicRecord = n;
-            currentRecord2 = null;
-            currentRecord1 = null;
-            UploadMusicRecord = null;
-        }
-        else
-            DeleteMusicRecord = null;
-    }
-    private void Upload(MusicRecord? n)
-    {
-        if (UploadMusicRecord is null)
-        {
-            UploadMusicRecord = n;
-            currentRecord1 = null;
-            currentRecord2 = null;
-            DeleteMusicRecord = null;
-        }
-        else
-            UploadMusicRecord = null;
-
-    }
-    private void Show1(MusicRecord n)
+    private void Show1(MusicRecordDisplayDto n)
     {
         if (currentRecord1 is null)
         {
             currentRecord1 = n;
             currentRecord2 = null;
-            UploadMusicRecord = null;
-            DeleteMusicRecord = null;
+            UploadRecordId = 0;
+            DeleteRecordId = 0;
         }
         else
             currentRecord1 = null;
     }
-    private void Show2(MusicRecord n)
+    private void Show2(MusicRecordDisplayDto n)
     {
         if (currentRecord2 is null)
         {
             currentRecord2 = n;
             currentRecord1 = null;
-            UploadMusicRecord = null;
-            DeleteMusicRecord = null;
+            UploadRecordId = 0;
+            DeleteRecordId = 0;
         }
         else
             currentRecord2 = null;
     }
+
+    // --- Edit / Add ---
+    private MusicRecord? EditMusicRecord;
+
+    private void AddNew()
+    {
+        EditMusicRecord = new MusicRecord();
+    }
+
+    private void Edit(int id)
+    {
+        EditMusicRecord = Service.GetRecordById(id);
+        currentRecord1 = null;
+        currentRecord2 = null;
+    }
+
+    private async Task CloseNote(bool result)
+    {
+        if (result && EditMusicRecord is not null)
+            await Save(EditMusicRecord);
+        EditMusicRecord = null;
+        RefreshList();
+    }
+
+    private async Task Save(MusicRecord? n)
+    {
+        if (n is null) return;
+        await Service.SaveDataSet(n);
+    }
+
+    // --- Delete ---
+    private int DeleteRecordId = 0;
+
+    private void Delete(MusicRecordDisplayDto n)
+    {
+        if (DeleteRecordId == 0)
+        {
+            DeleteRecordId = n.Id;
+            currentRecord2 = null;
+            currentRecord1 = null;
+            UploadRecordId = 0;
+        }
+        else
+            DeleteRecordId = 0;
+    }
+
+    private async Task CloseDeleteCallback(bool del)
+    {
+        if (del && DeleteRecordId != 0)
+        {
+            await Service.DeleteDataSet(DeleteRecordId);
+            RefreshList();
+            StateHasChanged();
+        }
+        DeleteRecordId = 0;
+    }
+
+    // --- Upload ---
+    private int UploadRecordId = 0;
+    private MusicRecord? UploadMusicRecord = null; // Needs full record for Upload component
+
+    private void Upload(MusicRecordDisplayDto n)
+    {
+        if (UploadRecordId == 0)
+        {
+            UploadRecordId = n.Id;
+            // Fetch full record because Upload component likely expects it
+            UploadMusicRecord = Service.GetRecordById(n.Id);
+            currentRecord1 = null;
+            currentRecord2 = null;
+            DeleteRecordId = 0;
+        }
+        else
+        {
+            UploadRecordId = 0;
+            UploadMusicRecord = null;
+        }
+    }
+
+    private async Task CloseUploadCallback()
+    {
+        UploadRecordId = 0;
+        UploadMusicRecord = null;
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    // --- Document Deletion ---
     private async Task DeleteFile(int id)
     {
-        // Call the JavaScript confirmDeletion function
         var confirmed = await JS.InvokeAsync<bool>("confirmDeletion", "Soll die Datei wirklich gelöscht werden?");
-
         if (confirmed)
         {
-            // Proceed with deletion
             string message = await Service.DeleteDocument(id);
             await ShowInfo(message);
         }
-    }
-    /// <summary>
-    ///
-    /// </summary>
-    private List<MusicRecord> MusicRecords = new();
-    protected override void OnInitialized()
-    {
-        MusicRecords = Service.GetAllMusicRecords();
     }
 
     private bool showMessage = false;
     private string messageText = "";
     private async Task ShowInfo(string m)
     {
-        // Set the message and show it
         messageText = m;
         showMessage = true;
-
-        // Re-render the component to show the message
         StateHasChanged();
-
-        // Wait for 3 seconds
         await Task.Delay(3000);
-
-        // Hide the message after 3 seconds
         showMessage = false;
-
-        // Re-render the component to hide the message
         StateHasChanged();
     }
 }
