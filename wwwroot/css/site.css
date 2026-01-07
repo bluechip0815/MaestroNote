@@ -83,3 +83,136 @@ a, .btn-link {
     border-radius: 5px;
     text-align: center;
 }
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+    /* Search Section */
+    .search-container {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+    .search-container > * {
+        width: 100% !important;
+        margin-bottom: 5px;
+    }
+    .search-container select,
+    .search-container input,
+    .search-container button {
+        width: 100% !important;
+    }
+
+    .date-search, .btn-add {
+        display: none !important;
+    }
+
+    /* Table to Card Transformation */
+    table, thead, tbody, th, td, tr {
+        display: block;
+    }
+
+    thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    tr {
+        border: 1px solid #ccc;
+        margin-bottom: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        background-color: #fff;
+        padding: 10px;
+    }
+
+    td {
+        border: none;
+        border-bottom: 1px solid #eee;
+        position: relative;
+        padding-left: 0;
+        padding: 5px 0;
+    }
+
+    td:last-child {
+        border-bottom: 0;
+    }
+
+    /* Buttons Row (Column 1) */
+    td:nth-of-type(1) {
+        order: 10; /* Move buttons to bottom of card if needed, or keep top */
+        display: flex;
+        justify-content: flex-end;
+        border-bottom: none;
+        padding-top: 10px;
+    }
+
+    /* Content Visibility & Typography */
+    /* Column 2: Komponist */
+    td:nth-of-type(2) {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #333;
+    }
+
+    /* Column 3: Werk */
+    td:nth-of-type(3) {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #333;
+        padding-bottom: 10px;
+    }
+
+    /* Column 4: Orchester */
+    td:nth-of-type(4) {
+        font-size: 0.9rem;
+        color: #555;
+    }
+
+    /* Column 5: Dirigent */
+    td:nth-of-type(5) {
+        font-size: 0.9rem;
+        color: #555;
+    }
+
+    /* Column 6: Solist */
+    td:nth-of-type(6) {
+        font-size: 0.9rem;
+        color: #555;
+    }
+
+    /* Column 7: Spielsaison */
+    td:nth-of-type(7) {
+        font-size: 0.75rem;
+        color: #888;
+        text-align: right;
+        margin-top: -30px; /* Hack to move it up if we want, or just let it sit */
+        float: right;
+    }
+
+    /* Hide unwanted buttons */
+    .btn-upload, .btn-delete, .btn-edit {
+        display: none !important;
+    }
+
+    /* Detail Views (The extra TRs) */
+    /* When a detail view is open, it appears as a separate TR block */
+    /* We need to ensure it doesn't look broken */
+    tr td[colspan="8"] {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        background-color: azure !important; /* Keep the highlight */
+    }
+
+    /* Specific adjustment for Detail Row 1 (Note) */
+    td pre {
+        white-space: pre-wrap; /* Wrap text on mobile */
+        word-break: break-word;
+    }
+
+    /* Images in detail view */
+    td img {
+        max-width: 100%;
+        height: auto;
+    }
+}
