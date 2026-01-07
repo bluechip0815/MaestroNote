@@ -25,7 +25,7 @@
     }
     else
     {
-        <div style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <div class="search-container" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 10px;">
             <select class="form-select" style="width: auto;" @bind="searchCategory">
                 @foreach (var cat in searchCategories)
                 {
@@ -35,10 +35,12 @@
 
             @if (searchCategory == "Datum")
             {
-                <span>von</span>
-                <input type="date" class="form-control" style="width: auto;" @bind="searchDateFrom" />
-                <span>bis</span>
-                <input type="date" class="form-control" style="width: auto;" @bind="searchDateTo" />
+                <span class="date-search">
+                    <span>von</span>
+                    <input type="date" class="form-control" style="width: auto;" @bind="searchDateFrom" />
+                    <span>bis</span>
+                    <input type="date" class="form-control" style="width: auto;" @bind="searchDateTo" />
+                </span>
             }
             else if (searchCategory == "Note")
             {
@@ -112,7 +114,7 @@
             </select>
             @if (PageEnabled == AccessType.ReadWrite)
             {
-                <button class="small-button" @onclick="() => AddNew()">
+                <button class="small-button btn-add" @onclick="() => AddNew()">
                     <i class="fas fa-cog"></i>
                 </button>
             }
@@ -136,10 +138,10 @@
                         <td>
                             <div class="button-container">
                                 <!-- Main content -->
-                                <button class="small-button" @onclick="() => Show1(record)">
+                                <button class="small-button btn-view-note" @onclick="() => Show1(record)">
                                     <i class="fas fa-envelope"></i>
                                 </button>
-                                <button class="small-button" @onclick="() => Show2(record)">
+                                <button class="small-button btn-view-home" @onclick="() => Show2(record)">
                                     <i class="fas fa-home"></i>
                                 </button>
                             </div>
@@ -147,10 +149,10 @@
                             {
                                 <div class="button-container">
                                     <!-- Main content -->
-                                    <button class="small-button" @onclick="() => Upload(record)">
+                                    <button class="small-button btn-upload" @onclick="() => Upload(record)">
                                         <i class="fas fa-upload"></i>
                                     </button>
-                                    <button class="small-button" @onclick="() => Delete(record)">
+                                    <button class="small-button btn-delete" @onclick="() => Delete(record)">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
@@ -185,7 +187,7 @@
                             <td>
                                 @if (PageEnabled == AccessType.ReadWrite)
                                 {
-                                    <button class="small-button" @onclick="() => Edit(record.Id)">
+                                    <button class="small-button btn-edit" @onclick="() => Edit(record.Id)">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                 }
