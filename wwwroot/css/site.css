@@ -1,7 +1,8 @@
 @import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background-color: #f8f9fa;
 }
 
 h1:focus {
@@ -9,13 +10,17 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: #0d6efd;
+    text-decoration: none;
+}
+a:hover, .btn-link:hover {
+    text-decoration: underline;
 }
 
 .btn-primary {
     color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    background-color: #0d6efd;
+    border-color: #0d6efd;
 }
 
 .content {
@@ -63,25 +68,44 @@ a, .btn-link {
         content: "An error has occurred."
    }
 
-.button-container {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 8px; /* Optional: Adds space between buttons */
+/* Modern Table Styles */
+.modern-table {
+    border-collapse: separate;
+    border-spacing: 0 8px; /* Space between rows */
 }
 
-.small-button {
-    padding: 4px 8px;
-    font-size: 12px;
-    border-radius: 4px;
+.modern-table tbody tr {
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.2s ease-in-out;
 }
 
-.alert {
-    padding: 10px;
-    background-color: #2196F3; /* Blue */
-    color: white;
-    margin-top: 15px;
-    border-radius: 5px;
-    text-align: center;
+.modern-table tbody tr:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.modern-table td {
+    padding: 12px 16px;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+}
+
+.modern-table td:first-child {
+    border-left: 1px solid #eee;
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.modern-table td:last-child {
+    border-right: 1px solid #eee;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+/* Modal Enhancements */
+.modal-backdrop.show {
+    opacity: 0.5;
 }
 
 /* Mobile Styles */
@@ -106,17 +130,17 @@ a, .btn-link {
     }
 
     /* Table to Card Transformation */
-    table, thead, tbody, th, td, tr {
+    .modern-table, .modern-table thead, .modern-table tbody, .modern-table th, .modern-table td, .modern-table tr {
         display: block;
     }
 
-    thead tr {
+    .modern-table thead tr {
         position: absolute;
         top: -9999px;
         left: -9999px;
     }
 
-    tr {
+    .modern-table tbody tr {
         border: 1px solid #ccc;
         margin-bottom: 1rem;
         border-radius: 8px;
@@ -125,7 +149,7 @@ a, .btn-link {
         padding: 10px;
     }
 
-    td {
+    .modern-table td {
         border: none;
         border-bottom: 1px solid #eee;
         position: relative;
@@ -133,86 +157,41 @@ a, .btn-link {
         padding: 5px 0;
     }
 
-    td:last-child {
+    .modern-table td:last-child {
         border-bottom: 0;
     }
 
-    /* Buttons Row (Column 1) */
-    td:nth-of-type(1) {
-        order: 10; /* Move buttons to bottom of card if needed, or keep top */
+    /* Column mapping for Mobile - Adjust based on new table structure in Index.razor */
+    /*
+       1: Komponist
+       2: Werk
+       3: Orchester/Dirigent
+       4: Solist
+       5: Saison
+       6: Actions
+    */
+
+    /* Actions (Last Column) -> Move to top */
+    .modern-table td:nth-of-type(6) {
+        order: -1;
         display: flex;
         justify-content: flex-end;
         border-bottom: none;
-        padding-top: 10px;
+        padding-bottom: 0;
     }
 
-    /* Content Visibility & Typography */
-    /* Column 2: Komponist */
-    td:nth-of-type(2) {
+    /* Komponist */
+    .modern-table td:nth-of-type(1) {
         font-weight: bold;
         font-size: 1.1rem;
         color: #333;
     }
 
-    /* Column 3: Werk */
-    td:nth-of-type(3) {
+    /* Werk */
+    .modern-table td:nth-of-type(2) {
         font-weight: bold;
         font-size: 1.1rem;
         color: #333;
         padding-bottom: 10px;
-    }
-
-    /* Column 4: Orchester */
-    td:nth-of-type(4) {
-        font-size: 0.9rem;
-        color: #555;
-    }
-
-    /* Column 5: Dirigent */
-    td:nth-of-type(5) {
-        font-size: 0.9rem;
-        color: #555;
-    }
-
-    /* Column 6: Solist */
-    td:nth-of-type(6) {
-        font-size: 0.9rem;
-        color: #555;
-    }
-
-    /* Column 7: Spielsaison */
-    td:nth-of-type(7) {
-        font-size: 0.75rem;
-        color: #888;
-        text-align: right;
-        margin-top: -30px; /* Hack to move it up if we want, or just let it sit */
-        float: right;
-    }
-
-    /* Hide unwanted buttons */
-    .btn-upload, .btn-delete, .btn-edit {
-        display: none !important;
-    }
-
-    /* Detail Views (The extra TRs) */
-    /* When a detail view is open, it appears as a separate TR block */
-    /* We need to ensure it doesn't look broken */
-    tr td[colspan="8"] {
-        display: block;
-        width: 100%;
-        padding: 10px;
-        background-color: azure !important; /* Keep the highlight */
-    }
-
-    /* Specific adjustment for Detail Row 1 (Note) */
-    td pre {
-        white-space: pre-wrap; /* Wrap text on mobile */
-        word-break: break-word;
-    }
-
-    /* Images in detail view */
-    td img {
-        max-width: 100%;
-        height: auto;
     }
 }
