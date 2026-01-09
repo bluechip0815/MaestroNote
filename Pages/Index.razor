@@ -2,6 +2,7 @@
 
 @using Microsoft.AspNetCore.Components.Web
 @using MaestroNotes.Data
+@using MaestroNotes.Shared
 @using static MaestroNotes.Data.MusicService
 
 @inject MusicService Service
@@ -21,11 +22,11 @@
     @if (EditMusicRecord is not null)
     {
         <h3>Bearbeiten</h3>
-        <Edit currentRecord="EditMusicRecord" CloseCallback="@CloseNote" />
+        <Edit currentRecord="EditMusicRecord" CloseCallback="@CloseEdit" />
     }
     else
     {
-        <div class="search-container" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <div class="search-container" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 20px;">
             <select class="form-select" style="width: auto;" @bind="searchCategory">
                 @foreach (var cat in searchCategories)
                 {
@@ -106,7 +107,7 @@
 
             <span>@GetNumber() Datensätze</span>
 
-            <select id="number" value="@selectedLimit" @onchange="Display">
+            <select id="number" value="@selectedLimit" @onchange="Display" class="form-select" style="width:auto;">
                 @foreach (var opt in limitOptions)
                 {
                     <option value="@opt.Key">@opt.Value</option>
@@ -114,146 +115,189 @@
             </select>
             @if (PageEnabled == AccessType.ReadWrite)
             {
-                <button class="small-button btn-add" @onclick="() => AddNew()">
-                    <i class="fas fa-cog"></i>
+                <button class="btn btn-primary" @onclick="() => AddNew()" title="Neuer Eintrag">
+                    <i class="fas fa-plus"></i>
                 </button>
             }
         </div>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>Komponist</th>
-                    <th>Werk</th>
-                    <th>Orchester</th>
-                    <th>Dirigent</th>
-                    <th>Solist</th>
-                    <th>Spielsaison</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var record in MusicRecords)
-                {
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle modern-table">
+                <thead class="table-light">
                     <tr>
-                        <td>
-                            <div class="button-container">
-                                <!-- Main content -->
-                                <button class="small-button btn-view-note" @onclick="() => Show1(record)">
-                                    <i class="fas fa-envelope"></i>
-                                </button>
-                                <button class="small-button btn-view-home" @onclick="() => Show2(record)">
-                                    <i class="fas fa-home"></i>
-                                </button>
-                            </div>
-                            @if (PageEnabled == AccessType.ReadWrite)
-                            {
-                                <div class="button-container">
-                                    <!-- Main content -->
-                                    <button class="small-button btn-upload" @onclick="() => Upload(record)">
-                                        <i class="fas fa-upload"></i>
-                                    </button>
-                                    <button class="small-button btn-delete" @onclick="() => Delete(record)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            }
-                        </td>
-                        <td>@record.KomponistNames</td>
-                        <td>@record.WerkNames</td>
-                        <td>@record.OrchesterName</td>
-                        <td>@record.DirigentName</td>
-                        <td>@record.SolistNames</td>
-                        <td>@record.Spielsaison</td>
+                        <th style="width: 20%;">Komponist</th>
+                        <th style="width: 25%;">Werk</th>
+                        <th style="width: 20%;">Orchester / Dirigent</th>
+                        <th style="width: 15%;">Solist</th>
+                        <th style="width: 10%;">Saison</th>
+                        <th style="width: 10%;">Aktionen</th>
                     </tr>
-                    @if (DeleteRecordId == record.Id)
+                </thead>
+                <tbody>
+                    @foreach (var record in MusicRecords)
                     {
                         <tr>
-                            <td colspan="8" style="background-color:lightpink">
-                                <Delete CloseDeleteCallback="@CloseDeleteCallback" />
-                            </td>
-                        </tr>
-                    }
-                    @if (UploadRecordId == record.Id)
-                    {
-                        <tr>
-                            <td colspan="8" style="background-color:lightcyan">
-                                <Upload currentRecord="@UploadMusicRecord" CloseUploadCallback="@CloseUploadCallback" />
-                            </td>
-                        </tr>
-                    }
-                    @if (currentRecord1 == record)
-                    {
-                        <tr>
+                            <td class="fw-bold text-primary">@record.KomponistNames</td>
+                            <td class="fw-bold">@record.WerkNames</td>
                             <td>
-                                @if (PageEnabled == AccessType.ReadWrite)
-                                {
-                                    <button class="small-button btn-edit" @onclick="() => Edit(record.Id)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                }
+                                <div>@record.OrchesterName</div>
+                                <div class="text-muted small">@record.DirigentName</div>
                             </td>
-                            <td colspan="7" style="background-color:azure">
-                                <pre>@currentRecord1.Bewertung</pre>
-                            </td>
-                        </tr>
-                    }
-                    @if (currentRecord2 == record)
-                    {
-                        <tr>
+                            <td class="small">@record.SolistNames</td>
+                            <td class="small text-muted">@record.Spielsaison</td>
                             <td>
-                                @if (PageEnabled == AccessType.ReadWrite)
-                                {
-                                    <button class="small-button" @onclick="() => Edit(record.Id)">
-                                        <i class="fas fa-edit"></i>
+                                <div class="dropdown">
+                                    <button class="btn btn-link text-dark dropdown-toggle" type="button" id="dropdownMenuButton-@record.Id" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-ellipsis-v"></i>
                                     </button>
-                                }
-                            </td>
-                            <td colspan="7" style="background-color:azure">
-                                <p>
-                                    [@currentRecord2.Id]
-                                    &nbsp;
-                                    &nbsp;
-                                    &nbsp;
-                                    @currentRecord2.Ort (@currentRecord2.Datum.ToString("yyyy-MM-dd"))
-                                </p>
-                                @if (Service.HasDocuments(currentRecord2.Id))
-                                {
-                                    @foreach (DOC item in Service.GetDocuments(currentRecord2.Id))
-                                    {
-                                        <p>
-                                            <a href="@item.path" target="_blank">@item.fn</a>
-                                            <button class="small-button" @onclick="() => DeleteFile(item.id)">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </p>
-                                    }
-                                    @foreach (DOC item in Service.GetImages(currentRecord2.Id))
-                                    {
-                                        <p>
-                                            <img src="@item.path" alt="@item.fn" width="600px" />
-                                            <button class="small-button" @onclick="() => DeleteFile(item.id)">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </p>
-                                    }
-                                }
+                                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-@record.Id">
+                                        <li>
+                                            <a class="dropdown-item" role="button" @onclick="() => OpenNoteModal(record)">
+                                                <i class="fas fa-envelope me-2 text-warning"></i> Note
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" role="button" @onclick="() => OpenDetailsModal(record)">
+                                                <i class="fas fa-info-circle me-2 text-info"></i> Details
+                                            </a>
+                                        </li>
+                                        @if (PageEnabled == AccessType.ReadWrite)
+                                        {
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
+                                                    <i class="fas fa-upload me-2 text-success"></i> Upload
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" role="button" @onclick="() => Edit(record.Id)">
+                                                    <i class="fas fa-edit me-2 text-primary"></i> Bearbeiten
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" role="button" @onclick="() => OpenDeleteModal(record)">
+                                                    <i class="fas fa-trash me-2"></i> Löschen
+                                                </a>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                     }
-                }
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     }
 }
 else
 {
-    <h3>Meine Konzerte</h3>
-    <p> <img src="Images/dresden.jpg" width="99%" /> </p>
-    <div class="form-group">
-        <label> Logon:</label>
-        <input type="text" @oninput="PageEnabler" id="EnablePage" size="5" />
+    <div class="text-center mt-5">
+        <h3 class="mb-4">Meine Konzerte</h3>
+        <p> <img src="Images/dresden.jpg" class="img-fluid rounded shadow" style="max-height: 500px;" /> </p>
+        <div class="form-group mt-3 d-inline-block">
+            <label class="me-2">Logon:</label>
+            <input type="text" @oninput="PageEnabler" id="EnablePage" class="form-control d-inline-block" style="width: 100px;" />
+        </div>
     </div>
 }
+
+@* --- Modals --- *@
+
+<ModalDialog Title="Notiz bearbeiten" Show="@ShowNoteModal" OnClose="@CloseNoteModal" ShowFooter="true">
+    <ChildContent>
+        @if (NoteRecord != null)
+        {
+            <div class="form-group">
+                <label class="form-label">Bewertung / Notiz:</label>
+                <textarea class="form-control" rows="10" @bind="NoteRecord.Bewertung"></textarea>
+            </div>
+        }
+    </ChildContent>
+    <FooterContent>
+        <button class="btn btn-secondary" @onclick="() => CloseNoteModal(false)">Abbrechen</button>
+        <button class="btn btn-primary" @onclick="SaveNote">Speichern</button>
+    </FooterContent>
+</ModalDialog>
+
+<ModalDialog Title="Details & Dokumente" Show="@ShowDetailsModal" OnClose="@CloseDetailsModal" ShowFooter="false">
+    <ChildContent>
+        @if (DetailsRecord != null)
+        {
+            <div class="mb-3">
+                <h5>@DetailsRecord.KomponistNames: @DetailsRecord.WerkNames</h5>
+                <p>
+                    <strong>Ort:</strong> @DetailsRecord.Ort <br />
+                    <strong>Datum:</strong> @DetailsRecord.Datum.ToString("dd.MM.yyyy")
+                </p>
+            </div>
+
+            <hr />
+
+            @if (Service.HasDocuments(DetailsRecord.Id))
+            {
+                <h6>Dokumente:</h6>
+                @foreach (DOC item in Service.GetDocuments(DetailsRecord.Id))
+                {
+                    <div class="d-flex align-items-center justify-content-between mb-2 p-2 border rounded">
+                        <a href="@item.path" target="_blank" class="text-decoration-none">
+                            <i class="fas fa-file-pdf me-2 text-danger"></i> @item.fn
+                        </a>
+                        @if (PageEnabled == AccessType.ReadWrite)
+                        {
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        }
+                    </div>
+                }
+
+                <h6 class="mt-3">Bilder:</h6>
+                @foreach (DOC item in Service.GetImages(DetailsRecord.Id))
+                {
+                    <div class="mb-3 p-2 border rounded">
+                        <img src="@item.path" alt="@item.fn" class="img-fluid mb-2" />
+                        <div class="d-flex justify-content-between">
+                             <span class="text-muted small">@item.fn</span>
+                             @if (PageEnabled == AccessType.ReadWrite)
+                             {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                             }
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="text-muted">Keine Dokumente oder Bilder vorhanden.</p>
+            }
+        }
+    </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="Datei hochladen" Show="@ShowUploadModal" OnClose="@CloseUploadModalWrapper" ShowFooter="false">
+    <ChildContent>
+        @if (UploadRecord != null)
+        {
+             <Upload currentRecord="@UploadRecord" CloseUploadCallback="@CloseUploadCallback" />
+        }
+    </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="Datensatz löschen" Show="@ShowDeleteModal" OnClose="@CloseDeleteModalWrapper" ShowFooter="false">
+    <ChildContent>
+        <div class="alert alert-warning">
+            Möchten Sie diesen Datensatz wirklich löschen?
+        </div>
+        @if (DeleteRecordId != 0)
+        {
+            <Delete CloseDeleteCallback="@CloseDeleteCallback" />
+        }
+    </ChildContent>
+</ModalDialog>
+
 
 @code {
     private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
@@ -337,36 +381,108 @@ else
         }
     }
 
-    // --- Detail Views ---
-    private MusicRecordDisplayDto? currentRecord1 = null;
-    private MusicRecordDisplayDto? currentRecord2 = null;
+    // --- Modal State Management ---
 
-    private void Show1(MusicRecordDisplayDto n)
+    // Note Modal
+    private bool ShowNoteModal = false;
+    private MusicRecord? NoteRecord;
+
+    private void OpenNoteModal(MusicRecordDisplayDto record)
     {
-        if (currentRecord1 is null)
-        {
-            currentRecord1 = n;
-            currentRecord2 = null;
-            UploadRecordId = 0;
-            DeleteRecordId = 0;
-        }
-        else
-            currentRecord1 = null;
-    }
-    private void Show2(MusicRecordDisplayDto n)
-    {
-        if (currentRecord2 is null)
-        {
-            currentRecord2 = n;
-            currentRecord1 = null;
-            UploadRecordId = 0;
-            DeleteRecordId = 0;
-        }
-        else
-            currentRecord2 = null;
+        NoteRecord = Service.GetRecordById(record.Id);
+        ShowNoteModal = true;
     }
 
-    // --- Edit / Add ---
+    private async Task SaveNote()
+    {
+        if (NoteRecord != null)
+        {
+            await Service.SaveDataSet(NoteRecord);
+            ShowNoteModal = false;
+            NoteRecord = null;
+            RefreshList();
+        }
+    }
+
+    private Task CloseNoteModal(bool result)
+    {
+        ShowNoteModal = false;
+        NoteRecord = null;
+        return Task.CompletedTask;
+    }
+
+    // Details Modal
+    private bool ShowDetailsModal = false;
+    private MusicRecordDisplayDto? DetailsRecord;
+
+    private void OpenDetailsModal(MusicRecordDisplayDto record)
+    {
+        DetailsRecord = record;
+        ShowDetailsModal = true;
+    }
+
+    private Task CloseDetailsModal(bool result)
+    {
+        ShowDetailsModal = false;
+        DetailsRecord = null;
+        return Task.CompletedTask;
+    }
+
+    // Upload Modal
+    private bool ShowUploadModal = false;
+    private MusicRecord? UploadRecord;
+
+    private void OpenUploadModal(MusicRecordDisplayDto record)
+    {
+        UploadRecord = Service.GetRecordById(record.Id);
+        ShowUploadModal = true;
+    }
+
+    private Task CloseUploadModalWrapper(bool result)
+    {
+        ShowUploadModal = false;
+        UploadRecord = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task CloseUploadCallback(bool result)
+    {
+        ShowUploadModal = false;
+        UploadRecord = null;
+        RefreshList(); // Refresh to show potential changes if any, though uploads are separate
+        await Task.CompletedTask;
+    }
+
+    // Delete Modal
+    private bool ShowDeleteModal = false;
+    private int DeleteRecordId = 0;
+
+    private void OpenDeleteModal(MusicRecordDisplayDto record)
+    {
+        DeleteRecordId = record.Id;
+        ShowDeleteModal = true;
+    }
+
+    private Task CloseDeleteModalWrapper(bool result)
+    {
+        ShowDeleteModal = false;
+        DeleteRecordId = 0;
+        return Task.CompletedTask;
+    }
+
+    private async Task CloseDeleteCallback(bool del)
+    {
+        if (del && DeleteRecordId != 0)
+        {
+            await Service.DeleteDataSet(DeleteRecordId);
+            RefreshList();
+            StateHasChanged();
+        }
+        ShowDeleteModal = false;
+        DeleteRecordId = 0;
+    }
+
+    // --- Edit (Full) ---
     private MusicRecord? EditMusicRecord;
 
     private void AddNew()
@@ -377,11 +493,9 @@ else
     private void Edit(int id)
     {
         EditMusicRecord = Service.GetRecordById(id);
-        currentRecord1 = null;
-        currentRecord2 = null;
     }
 
-    private async Task CloseNote(bool result)
+    private async Task CloseEdit(bool result)
     {
         if (result && EditMusicRecord is not null)
             await Save(EditMusicRecord);
@@ -395,63 +509,6 @@ else
         await Service.SaveDataSet(n);
     }
 
-    // --- Delete ---
-    private int DeleteRecordId = 0;
-
-    private void Delete(MusicRecordDisplayDto n)
-    {
-        if (DeleteRecordId == 0)
-        {
-            DeleteRecordId = n.Id;
-            currentRecord2 = null;
-            currentRecord1 = null;
-            UploadRecordId = 0;
-        }
-        else
-            DeleteRecordId = 0;
-    }
-
-    private async Task CloseDeleteCallback(bool del)
-    {
-        if (del && DeleteRecordId != 0)
-        {
-            await Service.DeleteDataSet(DeleteRecordId);
-            RefreshList();
-            StateHasChanged();
-        }
-        DeleteRecordId = 0;
-    }
-
-    // --- Upload ---
-    private int UploadRecordId = 0;
-    private MusicRecord? UploadMusicRecord = null; // Needs full record for Upload component
-
-    private void Upload(MusicRecordDisplayDto n)
-    {
-        if (UploadRecordId == 0)
-        {
-            UploadRecordId = n.Id;
-            // Fetch full record because Upload component likely expects it
-            UploadMusicRecord = Service.GetRecordById(n.Id);
-            currentRecord1 = null;
-            currentRecord2 = null;
-            DeleteRecordId = 0;
-        }
-        else
-        {
-            UploadRecordId = 0;
-            UploadMusicRecord = null;
-        }
-    }
-
-    private async Task CloseUploadCallback()
-    {
-        UploadRecordId = 0;
-        UploadMusicRecord = null;
-        StateHasChanged();
-        await Task.CompletedTask;
-    }
-
     // --- Document Deletion ---
     private async Task DeleteFile(int id)
     {
@@ -460,6 +517,9 @@ else
         {
             string message = await Service.DeleteDocument(id);
             await ShowInfo(message);
+            // Refresh details view if open? The service returns void, we manually updated lists.
+            // But Service.GetDocuments pulls from DB or folder.
+            // StateHasChanged handles re-render of the modal content.
         }
     }
 
