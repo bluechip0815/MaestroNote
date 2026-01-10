@@ -318,6 +318,25 @@ namespace MaestroNotes.Data
         // Speichert oder aktualisiert (EF erkennt anhand der ID meist selbst, ob Add oder Update)
         public async Task SaveAsync<T>(T entity) where T : class
         {
+            // Check if entity is already tracked to avoid conflicts
+            var idProp = typeof(T).GetProperty("Id");
+            if (idProp != null && idProp.PropertyType == typeof(int))
+            {
+                int id = (int)idProp.GetValue(entity);
+                if (id != 0)
+                {
+                    var existing = _context.ChangeTracker.Entries<T>()
+                        .FirstOrDefault(e => (int)idProp.GetValue(e.Entity) == id);
+
+                    if (existing != null)
+                    {
+                         existing.CurrentValues.SetValues(entity);
+                         await _context.SaveChangesAsync();
+                         return;
+                    }
+                }
+            }
+
             _context.Update(entity); // Funktioniert für neue und bestehende Entities
             await _context.SaveChangesAsync();
         }
@@ -337,6 +356,13 @@ namespace MaestroNotes.Data
         public List<Orchester> GetAllOrchester() => _context.Orchester.ToList();
         public List<Dirigent> GetAllDirigenten() => _context.Dirigenten.ToList();
         public List<Solist> GetAllSolisten() => _context.Solisten.ToList();
+
+        // NoTracking variants for Master Data Management to avoid context tracking conflicts
+        public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().ToList();
+        public List<Werk> GetAllWerkeNoTracking() => _context.Werke.Include(w => w.Komponist).AsNoTracking().ToList();
+        public List<Orchester> GetAllOrchesterNoTracking() => _context.Orchester.AsNoTracking().ToList();
+        public List<Dirigent> GetAllDirigentenNoTracking() => _context.Dirigenten.AsNoTracking().ToList();
+        public List<Solist> GetAllSolistenNoTracking() => _context.Solisten.AsNoTracking().ToList();
 
         public async Task AddKomponist(Komponist k)
         {

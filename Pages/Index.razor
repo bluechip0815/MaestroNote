@@ -3,9 +3,12 @@
 @using Microsoft.AspNetCore.Components.Web
 @using MaestroNotes.Data
 @using MaestroNotes.Shared
+@using System.Text.Json
+@using System.Text.Json.Serialization
 @using static MaestroNotes.Data.MusicService
 
 @inject MusicService Service
+@inject AiService AiService
 @inject IJSRuntime JS
 
 <PageTitle>Meine Konzerte</PageTitle>
@@ -115,6 +118,18 @@
             </select>
             @if (PageEnabled == AccessType.ReadWrite)
             {
+                <div class="dropdown d-inline-block me-2">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMaster" data-bs-toggle="dropdown" aria-expanded="false">
+                        Stammdaten
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dropdownMaster">
+                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Dirigent")'>Dirigent</a></li>
+                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Orchester")'>Orchester</a></li>
+                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Solist")'>Solist</a></li>
+                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Werk")'>Werk</a></li>
+                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Komponist")'>Komponist</a></li>
+                    </ul>
+                </div>
                 <button class="btn btn-primary" @onclick="() => AddNew()" title="Neuer Eintrag">
                     <i class="fas fa-plus"></i>
                 </button>
@@ -296,6 +311,207 @@ else
             <Delete CloseDeleteCallback="@CloseDeleteCallback" />
         }
     </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="@("Stammdaten: " + MasterType)" Show="@ShowMasterListModal" OnClose="@CloseMasterListModal" ShowFooter="false">
+    <ChildContent>
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        @if (MasterType == "Dirigent" || MasterType == "Solist" || MasterType == "Komponist")
+                        {
+                            <th>Vorname</th>
+                            <th>Name</th>
+                        }
+                        else
+                        {
+                            <th>Name</th>
+                        }
+
+                        @if (MasterType == "Werk")
+                        {
+                            <th>Komponist</th>
+                        }
+
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in MasterList)
+                    {
+                        <tr>
+                            @if (MasterType == "Dirigent")
+                            {
+                                var d = (Dirigent)item;
+                                <td>@d.Vorname</td>
+                                <td>@d.Name</td>
+                            }
+                            else if (MasterType == "Solist")
+                            {
+                                var s = (Solist)item;
+                                <td>@s.Vorname</td>
+                                <td>@s.Name</td>
+                            }
+                            else if (MasterType == "Komponist")
+                            {
+                                var k = (Komponist)item;
+                                <td>@k.Vorname</td>
+                                <td>@k.Name</td>
+                            }
+                            else if (MasterType == "Orchester")
+                            {
+                                var o = (Orchester)item;
+                                <td>@o.Name</td>
+                            }
+                            else if (MasterType == "Werk")
+                            {
+                                var w = (Werk)item;
+                                <td>@w.Name</td>
+                                <td>@(w.Komponist?.Name ?? "-")</td>
+                            }
+
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenMasterEdit(item)">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="@("Bearbeiten: " + MasterType)" Show="@ShowMasterEditModal" OnClose="@CloseMasterEditModal" ShowFooter="true">
+    <ChildContent>
+        @if (EditMasterItem != null)
+        {
+            <div class="form-group mb-2">
+                @if (MasterType == "Dirigent")
+                {
+                    var d = (Dirigent)EditMasterItem;
+                    <div class="row">
+                        <div class="col">
+                            <label>Vorname</label>
+                            <input type="text" class="form-control" @bind="d.Vorname" />
+                        </div>
+                        <div class="col">
+                            <label>Name</label>
+                            <input type="text" class="form-control" @bind="d.Name" />
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label>Geboren</label>
+                        <input type="date" class="form-control" @bind="d.Born" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="d.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
+                    </div>
+                }
+                else if (MasterType == "Solist")
+                {
+                    var s = (Solist)EditMasterItem;
+                    <div class="row">
+                        <div class="col">
+                            <label>Vorname</label>
+                            <input type="text" class="form-control" @bind="s.Vorname" />
+                        </div>
+                        <div class="col">
+                            <label>Name</label>
+                            <input type="text" class="form-control" @bind="s.Name" />
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label>Geboren</label>
+                        <input type="date" class="form-control" @bind="s.Born" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="s.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
+                    </div>
+                }
+                else if (MasterType == "Komponist")
+                {
+                    var k = (Komponist)EditMasterItem;
+                    <div class="row">
+                        <div class="col">
+                            <label>Vorname</label>
+                            <input type="text" class="form-control" @bind="k.Vorname" />
+                        </div>
+                        <div class="col">
+                            <label>Name</label>
+                            <input type="text" class="form-control" @bind="k.Name" />
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label>Geboren</label>
+                        <input type="date" class="form-control" @bind="k.Born" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="k.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
+                    </div>
+                }
+                else if (MasterType == "Orchester")
+                {
+                    var o = (Orchester)EditMasterItem;
+                    <label>Name</label>
+                    <input type="text" class="form-control" @bind="o.Name" />
+                     <div class="mt-2">
+                        <label>Gegründet</label>
+                        <input type="date" class="form-control" @bind="o.Founded" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="o.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
+                    </div>
+                }
+                else if (MasterType == "Werk")
+                {
+                    var w = (Werk)EditMasterItem;
+                    <label>Name</label>
+                    <input type="text" class="form-control" @bind="w.Name" />
+
+                    <div class="mt-2">
+                         <label>Komponist</label>
+                         <select class="form-select" @bind="w.KomponistId">
+                            <option value="">Bitte wählen...</option>
+                            @foreach (var k in AllKomponisten)
+                            {
+                                <option value="@k.Id">@k.Name, @k.Vorname</option>
+                            }
+                         </select>
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="w.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
+                    </div>
+                }
+            </div>
+        }
+    </ChildContent>
+    <FooterContent>
+        <button class="btn btn-secondary" @onclick="() => CloseMasterEditModal(false)">Abbrechen</button>
+        <button class="btn btn-primary" @onclick="SaveMasterItem">Speichern</button>
+    </FooterContent>
 </ModalDialog>
 
 
@@ -533,5 +749,169 @@ else
         await Task.Delay(3000);
         showMessage = false;
         StateHasChanged();
+    }
+
+    // --- Master Data Management ---
+
+    private bool ShowMasterListModal = false;
+    private string MasterType = "";
+    private List<object> MasterList = new();
+
+    // Edit State
+    private bool ShowMasterEditModal = false;
+    private dynamic? EditMasterItem; // Using dynamic to bind fields regardless of type
+    private List<Komponist> AllKomponisten = new();
+
+    private void OpenMasterList(string type)
+    {
+        MasterType = type;
+        LoadMasterList();
+        ShowMasterListModal = true;
+    }
+
+    private void LoadMasterList()
+    {
+        MasterList.Clear();
+        switch (MasterType)
+        {
+            case "Dirigent":
+                MasterList = Service.GetAllDirigentenNoTracking().Cast<object>().ToList();
+                break;
+            case "Orchester":
+                MasterList = Service.GetAllOrchesterNoTracking().Cast<object>().ToList();
+                break;
+            case "Solist":
+                MasterList = Service.GetAllSolistenNoTracking().Cast<object>().ToList();
+                break;
+            case "Werk":
+                MasterList = Service.GetAllWerkeNoTracking().Cast<object>().ToList();
+                break;
+            case "Komponist":
+                MasterList = Service.GetAllKomponistenNoTracking().Cast<object>().ToList();
+                break;
+        }
+    }
+
+    private Task CloseMasterListModal(bool result)
+    {
+        ShowMasterListModal = false;
+        return Task.CompletedTask;
+    }
+
+    private void OpenMasterEdit(object item)
+    {
+        // Clone the item to avoid modifying the list directly before saving
+        // This prevents the UI from showing changes if the user cancels
+        var options = new JsonSerializerOptions { ReferenceHandler = ReferenceHandler.IgnoreCycles };
+        var json = JsonSerializer.Serialize(item, options);
+
+        switch (MasterType)
+        {
+            case "Dirigent":
+                EditMasterItem = JsonSerializer.Deserialize<Dirigent>(json, options);
+                break;
+            case "Orchester":
+                EditMasterItem = JsonSerializer.Deserialize<Orchester>(json, options);
+                break;
+            case "Solist":
+                EditMasterItem = JsonSerializer.Deserialize<Solist>(json, options);
+                break;
+            case "Werk":
+                var w = JsonSerializer.Deserialize<Werk>(json, options);
+                // Prevent EF Core tracking issues with the related entity
+                // We only want to update the FK (KomponistId)
+                if (w != null) w.Komponist = null;
+                EditMasterItem = w;
+                AllKomponisten = Service.GetAllKomponistenNoTracking().OrderBy(k => k.Name).ToList();
+                break;
+            case "Komponist":
+                EditMasterItem = JsonSerializer.Deserialize<Komponist>(json, options);
+                break;
+        }
+
+        ShowMasterEditModal = true;
+    }
+
+    private Task CloseMasterEditModal(bool result)
+    {
+        ShowMasterEditModal = false;
+        EditMasterItem = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task FillMasterAi()
+    {
+        if (EditMasterItem == null) return;
+
+        string name = "";
+        try
+        {
+            switch (MasterType)
+            {
+                case "Dirigent":
+                    var d = (Dirigent)EditMasterItem;
+                    name = $"{d.Vorname} {d.Name}".Trim();
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var dRes = await AiService.RequestAiData(name, "Dirigent") as AiDirigentResponseDto;
+                    if (dRes != null) { d.Born = dRes.Born; d.Note = dRes.Note; }
+                    break;
+                case "Solist":
+                    var s = (Solist)EditMasterItem;
+                    name = $"{s.Vorname} {s.Name}".Trim();
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var sRes = await AiService.RequestAiData(name, "Solist") as AiSolistResponseDto;
+                    if (sRes != null) { s.Born = sRes.Born; s.Note = sRes.Note; }
+                    break;
+                case "Komponist":
+                    var k = (Komponist)EditMasterItem;
+                    name = $"{k.Vorname} {k.Name}".Trim();
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var kRes = await AiService.RequestAiData(name, "Komponist") as AiKomponistResponseDto;
+                    if (kRes != null) { k.Born = kRes.Born; k.Note = kRes.Note; }
+                    break;
+                case "Orchester":
+                    var o = (Orchester)EditMasterItem;
+                    name = o.Name;
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var oRes = await AiService.RequestAiData(name, "Orchester") as AiOrchesterResponseDto;
+                    if (oRes != null) { o.Founded = oRes.Founded; o.Note = oRes.Note; }
+                    break;
+                case "Werk":
+                    var w = (Werk)EditMasterItem;
+                    name = w.Name;
+                    if (w.KomponistId != null)
+                    {
+                        var comp = AllKomponisten.FirstOrDefault(c => c.Id == w.KomponistId);
+                        if (comp != null) name += $" ({comp.Vorname} {comp.Name})";
+                    }
+
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var wRes = await AiService.RequestAiData(name, "Werk") as AiWerkResponseDto;
+                    if (wRes != null) { w.Note = wRes.Note; }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+             await JS.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+        }
+    }
+
+    private async Task SaveMasterItem()
+    {
+        if (EditMasterItem != null)
+        {
+            await Service.SaveAsync(EditMasterItem);
+
+            // Reload the list to show updates
+            LoadMasterList();
+
+            // Close edit modal
+            ShowMasterEditModal = false;
+            EditMasterItem = null;
+
+            // Refresh main list as names might have changed
+            RefreshList();
+        }
     }
 }

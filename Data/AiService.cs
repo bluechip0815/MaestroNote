@@ -18,6 +18,23 @@ namespace MaestroNotes.Data
         public string? Note { get; set; }
     }
 
+    public class AiSolistResponseDto
+    {
+        public DateTime? Born { get; set; }
+        public string? Note { get; set; }
+    }
+
+    public class AiKomponistResponseDto
+    {
+        public DateTime? Born { get; set; }
+        public string? Note { get; set; }
+    }
+
+    public class AiWerkResponseDto
+    {
+        public string? Note { get; set; }
+    }
+
     public class AiService
     {
         private readonly IAiProvider _aiProvider;
@@ -41,7 +58,7 @@ namespace MaestroNotes.Data
 
             // Append JSON structure requirement
             string jsonStructure = "";
-            Type targetType = null;
+            Type? targetType = null;
 
             if (itemType.Equals("Dirigent", StringComparison.OrdinalIgnoreCase))
             {
@@ -52,6 +69,21 @@ namespace MaestroNotes.Data
             {
                 targetType = typeof(AiOrchesterResponseDto);
                 jsonStructure = JsonSerializer.Serialize(new AiOrchesterResponseDto { Founded = DateTime.Now, Note = "Example Note" });
+            }
+            else if (itemType.Equals("Solist", StringComparison.OrdinalIgnoreCase))
+            {
+                targetType = typeof(AiSolistResponseDto);
+                jsonStructure = JsonSerializer.Serialize(new AiSolistResponseDto { Born = DateTime.Now, Note = "Example Note" });
+            }
+            else if (itemType.Equals("Komponist", StringComparison.OrdinalIgnoreCase))
+            {
+                targetType = typeof(AiKomponistResponseDto);
+                jsonStructure = JsonSerializer.Serialize(new AiKomponistResponseDto { Born = DateTime.Now, Note = "Example Note" });
+            }
+            else if (itemType.Equals("Werk", StringComparison.OrdinalIgnoreCase))
+            {
+                targetType = typeof(AiWerkResponseDto);
+                jsonStructure = JsonSerializer.Serialize(new AiWerkResponseDto { Note = "Example Note" });
             }
             else
             {
@@ -72,7 +104,7 @@ namespace MaestroNotes.Data
                     PropertyNameCaseInsensitive = true
                 };
 
-                return JsonSerializer.Deserialize(jsonResponse, targetType, options);
+                return JsonSerializer.Deserialize(jsonResponse, targetType, options) ?? "";
             }
             catch (Exception ex)
             {
