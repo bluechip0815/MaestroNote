@@ -41,7 +41,7 @@ namespace MaestroNotes.Data
 
             // Append JSON structure requirement
             string jsonStructure = "";
-            Type targetType = null;
+            Type? targetType = null;
 
             if (itemType.Equals("Dirigent", StringComparison.OrdinalIgnoreCase))
             {
@@ -72,7 +72,7 @@ namespace MaestroNotes.Data
                     PropertyNameCaseInsensitive = true
                 };
 
-                return JsonSerializer.Deserialize(jsonResponse, targetType, options);
+                return JsonSerializer.Deserialize(jsonResponse, targetType, options) ?? "";
             }
             catch (Exception ex)
             {

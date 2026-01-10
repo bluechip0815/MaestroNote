@@ -388,40 +388,95 @@ else
         @if (EditMasterItem != null)
         {
             <div class="form-group mb-2">
-                @if (MasterType == "Dirigent" || MasterType == "Solist" || MasterType == "Komponist")
+                @if (MasterType == "Dirigent")
                 {
-                     <div class="row">
+                    var d = (Dirigent)EditMasterItem;
+                    <div class="row">
                         <div class="col">
                             <label>Vorname</label>
-                            <input type="text" class="form-control" @bind="EditMasterItem.Vorname" />
+                            <input type="text" class="form-control" @bind="d.Vorname" />
                         </div>
                         <div class="col">
                             <label>Name</label>
-                            <input type="text" class="form-control" @bind="EditMasterItem.Name" />
+                            <input type="text" class="form-control" @bind="d.Name" />
                         </div>
                     </div>
                     <div class="mt-2">
                         <label>Geboren</label>
-                        <input type="date" class="form-control" @bind="EditMasterItem.Born" />
+                        <input type="date" class="form-control" @bind="d.Born" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="d.Note"></textarea>
+                    </div>
+                }
+                else if (MasterType == "Solist")
+                {
+                    var s = (Solist)EditMasterItem;
+                    <div class="row">
+                        <div class="col">
+                            <label>Vorname</label>
+                            <input type="text" class="form-control" @bind="s.Vorname" />
+                        </div>
+                        <div class="col">
+                            <label>Name</label>
+                            <input type="text" class="form-control" @bind="s.Name" />
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label>Geboren</label>
+                        <input type="date" class="form-control" @bind="s.Born" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="s.Note"></textarea>
+                    </div>
+                }
+                else if (MasterType == "Komponist")
+                {
+                    var k = (Komponist)EditMasterItem;
+                    <div class="row">
+                        <div class="col">
+                            <label>Vorname</label>
+                            <input type="text" class="form-control" @bind="k.Vorname" />
+                        </div>
+                        <div class="col">
+                            <label>Name</label>
+                            <input type="text" class="form-control" @bind="k.Name" />
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label>Geboren</label>
+                        <input type="date" class="form-control" @bind="k.Born" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="k.Note"></textarea>
                     </div>
                 }
                 else if (MasterType == "Orchester")
                 {
+                    var o = (Orchester)EditMasterItem;
                     <label>Name</label>
-                    <input type="text" class="form-control" @bind="EditMasterItem.Name" />
+                    <input type="text" class="form-control" @bind="o.Name" />
                      <div class="mt-2">
                         <label>Gegründet</label>
-                        <input type="date" class="form-control" @bind="EditMasterItem.Founded" />
+                        <input type="date" class="form-control" @bind="o.Founded" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="o.Note"></textarea>
                     </div>
                 }
                 else if (MasterType == "Werk")
                 {
+                    var w = (Werk)EditMasterItem;
                     <label>Name</label>
-                    <input type="text" class="form-control" @bind="EditMasterItem.Name" />
+                    <input type="text" class="form-control" @bind="w.Name" />
 
                     <div class="mt-2">
                          <label>Komponist</label>
-                         <select class="form-select" @bind="EditMasterItem.KomponistId">
+                         <select class="form-select" @bind="w.KomponistId">
                             <option value="">Bitte wählen...</option>
                             @foreach (var k in AllKomponisten)
                             {
@@ -429,12 +484,11 @@ else
                             }
                          </select>
                     </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="w.Note"></textarea>
+                    </div>
                 }
-
-                <div class="mt-2">
-                    <label>Notiz</label>
-                    <textarea class="form-control" rows="3" @bind="EditMasterItem.Note"></textarea>
-                </div>
             </div>
         }
     </ChildContent>
