@@ -14,6 +14,7 @@ string? connectionString = builder.Configuration.GetConnectionString("DefaultCon
 string? serverVersion = builder.Configuration.GetConnectionString("ServerVersion");
 builder.Services.AddDbContext<MusicContext>(option => option.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 38))));
 builder.Services.AddScoped<MusicService>();
+builder.Services.AddScoped<AiService>();
 
 var app = builder.Build();
 

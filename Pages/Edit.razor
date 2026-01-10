@@ -1,6 +1,8 @@
 @using System.ComponentModel.DataAnnotations
 @using MaestroNotes.Data
 @inject MusicService Service
+@inject AiService AiService
+@inject IJSRuntime JSRuntime
 
 <EditForm Model="@currentRecord">
     <DataAnnotationsValidator />
@@ -179,7 +181,18 @@
                     <button type="button" class="btn-close" @onclick="() => showNewOrchester = false"></button>
                 </div>
                 <div class="modal-body">
-                    <input class="form-control" placeholder="Name" @bind="newOrchester.Name" />
+                    <input class="form-control mb-2" placeholder="Name" @bind="newOrchester.Name" />
+                    <div class="mb-2">
+                        <label>Gegründet:</label>
+                        <InputDate class="form-control" @bind-Value="newOrchester.Founded" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Notiz:</label>
+                        <textarea class="form-control" rows="3" @bind="newOrchester.Note"></textarea>
+                    </div>
+                    <div class="mb-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillOrchesterAi">AI Vervollständigen</button>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="() => showNewOrchester = false">Abbrechen</button>
@@ -202,7 +215,18 @@
                 </div>
                 <div class="modal-body">
                     <input class="form-control mb-2" placeholder="Vorname" @bind="newDirigent.Vorname" />
-                    <input class="form-control" placeholder="Name" @bind="newDirigent.Name" />
+                    <input class="form-control mb-2" placeholder="Name" @bind="newDirigent.Name" />
+                    <div class="mb-2">
+                        <label>Geboren:</label>
+                        <InputDate class="form-control" @bind-Value="newDirigent.Born" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Notiz:</label>
+                        <textarea class="form-control" rows="3" @bind="newDirigent.Note"></textarea>
+                    </div>
+                    <div class="mb-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillDirigentAi">AI Vervollständigen</button>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="() => showNewDirigent = false">Abbrechen</button>
@@ -315,6 +339,56 @@
     private void Close(bool result)
     {
         CloseCallback.InvokeAsync(result);
+    }
+
+    // --- AI Helpers ---
+
+    private async Task FillOrchesterAi()
+    {
+        if (string.IsNullOrWhiteSpace(newOrchester.Name))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Namen ein.");
+            return;
+        }
+
+        try
+        {
+            var result = await AiService.RequestAiData(newOrchester.Name, "Orchester");
+            if (result is AiOrchesterResponseDto dto)
+            {
+                newOrchester.Founded = dto.Founded;
+                newOrchester.Note = dto.Note;
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+        }
+    }
+
+    private async Task FillDirigentAi()
+    {
+         if (string.IsNullOrWhiteSpace(newDirigent.Name))
+        {
+             await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Namen ein.");
+             return;
+        }
+
+        try
+        {
+            // Combined name for better context if needed
+            string fullName = $"{newDirigent.Vorname} {newDirigent.Name}".Trim();
+            var result = await AiService.RequestAiData(fullName, "Dirigent");
+            if (result is AiDirigentResponseDto dto)
+            {
+                newDirigent.Born = dto.Born;
+                newDirigent.Note = dto.Note;
+            }
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+        }
     }
 
     // --- Save Helpers ---
