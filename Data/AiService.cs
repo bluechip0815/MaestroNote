@@ -1,5 +1,8 @@
 using System;
 using System.Threading.Tasks;
+using MaestroNotes.Data.Ai;
+using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace MaestroNotes.Data
 {
@@ -17,29 +20,87 @@ namespace MaestroNotes.Data
 
     public class AiService
     {
+        private readonly IAiProvider _aiProvider;
+        private readonly AiSettings _settings;
+
+        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings)
+        {
+            _aiProvider = aiProvider;
+            _settings = settings.Value;
+        }
+
         public async Task<object> RequestAiData(string name, string itemType)
         {
-            // Simulate network delay
-            await Task.Delay(500);
+            if (!_settings.Prompts.TryGetValue(itemType, out var promptSettings))
+            {
+                throw new ArgumentException($"No prompt configuration found for item type: {itemType}", nameof(itemType));
+            }
+
+            string userPrompt = string.Format(promptSettings.User, name);
+            string systemPrompt = _settings.System;
+
+            // Append JSON structure requirement
+            string jsonStructure = "";
+            Type targetType = null;
 
             if (itemType.Equals("Dirigent", StringComparison.OrdinalIgnoreCase))
             {
-                return new AiDirigentResponseDto
-                {
-                    Born = new DateTime(1980, 1, 1),
-                    Note = $"AI Note for Dirigent {name}: Lorem ipsum dolor sit amet."
-                };
+                targetType = typeof(AiDirigentResponseDto);
+                jsonStructure = JsonSerializer.Serialize(new AiDirigentResponseDto { Born = DateTime.Now, Note = "Example Note" });
             }
             else if (itemType.Equals("Orchester", StringComparison.OrdinalIgnoreCase))
             {
-                return new AiOrchesterResponseDto
-                {
-                    Founded = new DateTime(1950, 5, 20),
-                    Note = $"AI Note for Orchester {name}: Consectetur adipiscing elit."
-                };
+                targetType = typeof(AiOrchesterResponseDto);
+                jsonStructure = JsonSerializer.Serialize(new AiOrchesterResponseDto { Founded = DateTime.Now, Note = "Example Note" });
+            }
+            else
+            {
+                 throw new ArgumentException($"Unsupported item type for JSON serialization: {itemType}", nameof(itemType));
             }
 
-            throw new ArgumentException("Unknown item type", nameof(itemType));
+            userPrompt += $"\n\nPlease return the response as a raw JSON object strictly matching this structure:\n{jsonStructure}";
+
+            try
+            {
+                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, _settings.Model);
+
+                // Clean up potential markdown code blocks (```json ... ```)
+                jsonResponse = StripMarkdown(jsonResponse);
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                return JsonSerializer.Deserialize(jsonResponse, targetType, options);
+            }
+            catch (Exception ex)
+            {
+                // In a real scenario, you might want to log this error
+                throw new ApplicationException($"AI request failed: {ex.Message}", ex);
+            }
+        }
+
+        private string StripMarkdown(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            var result = text.Trim();
+            if (result.StartsWith("```json"))
+            {
+                result = result.Substring(7);
+            }
+            else if (result.StartsWith("```"))
+            {
+                result = result.Substring(3);
+            }
+
+            if (result.EndsWith("```"))
+            {
+                result = result.Substring(0, result.Length - 3);
+            }
+
+            return result.Trim();
         }
     }
 }

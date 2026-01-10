@@ -1,4 +1,5 @@
 using MaestroNotes.Data;
+using MaestroNotes.Data.Ai;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -10,11 +11,30 @@ SetLogging(builder);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
+// Configure AI Settings
+builder.Services.Configure<AiSettings>(builder.Configuration.GetSection("AiSettings"));
+
 string? connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 string? serverVersion = builder.Configuration.GetConnectionString("ServerVersion");
 builder.Services.AddDbContext<MusicContext>(option => option.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 38))));
 builder.Services.AddScoped<MusicService>();
+
+// Register AI Service and Provider
 builder.Services.AddScoped<AiService>();
+builder.Services.AddHttpClient("AiClient"); // Register named client if needed, or just let Factory handle it.
+
+builder.Services.AddScoped<IAiProvider>(sp =>
+{
+    var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AiSettings>>().Value;
+    var httpClient = HttpClientFactory.Create(settings);
+
+    return settings.Provider.ToLower() switch
+    {
+        "gemini" => new GeminiProvider(httpClient, settings.ApiKey, settings.ProviderUrl),
+        "anthropic" => new AnthropicProvider(httpClient, settings.ApiKey, settings.ProviderUrl),
+        "chatgpt" or _ => new OpenAiProvider(httpClient, settings.ApiKey, settings.ProviderUrl),
+    };
+});
 
 var app = builder.Build();
 
