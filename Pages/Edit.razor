@@ -184,7 +184,7 @@
                     <input class="form-control mb-2" placeholder="Name" @bind="newOrchester.Name" />
                     <div class="mb-2">
                         <label>Gegründet:</label>
-                        <InputDate class="form-control" @bind-Value="newOrchester.Founded" />
+                        <input type="date" class="form-control" @bind="newOrchester.Founded" />
                     </div>
                     <div class="mb-2">
                         <label>Notiz:</label>
@@ -218,7 +218,7 @@
                     <input class="form-control mb-2" placeholder="Name" @bind="newDirigent.Name" />
                     <div class="mb-2">
                         <label>Geboren:</label>
-                        <InputDate class="form-control" @bind-Value="newDirigent.Born" />
+                        <input type="date" class="form-control" @bind="newDirigent.Born" />
                     </div>
                     <div class="mb-2">
                         <label>Notiz:</label>
@@ -249,7 +249,18 @@
                 </div>
                 <div class="modal-body">
                     <input class="form-control mb-2" placeholder="Vorname" @bind="newSolist.Vorname" />
-                    <input class="form-control" placeholder="Name" @bind="newSolist.Name" />
+                    <input class="form-control mb-2" placeholder="Name" @bind="newSolist.Name" />
+                    <div class="mb-2">
+                        <label>Geboren:</label>
+                        <input type="date" class="form-control" @bind="newSolist.Born" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Notiz:</label>
+                        <textarea class="form-control" rows="3" @bind="newSolist.Note"></textarea>
+                    </div>
+                    <div class="mb-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillSolistAi">AI Vervollständigen</button>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="() => showNewSolist = false">Abbrechen</button>
@@ -273,19 +284,58 @@
                 <div class="modal-body">
                     <div class="mb-2">
                         <label>Komponist (erforderlich):</label>
-                        <select class="form-control" @bind="newWerk.KomponistId">
-                            <option value="">Bitte wählen...</option>
-                            @foreach (var k in KomponistenList)
-                            {
-                                <option value="@k.Id">@k.Name, @k.Vorname</option>
-                            }
-                        </select>
+                        <div class="input-group">
+                             <select class="form-control" @bind="newWerk.KomponistId">
+                                <option value="">Bitte wählen...</option>
+                                @foreach (var k in KomponistenList)
+                                {
+                                    <option value="@k.Id">@k.Name, @k.Vorname</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => showNewKomponist = true">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
                     </div>
                     <input class="form-control" placeholder="Werk Name" @bind="newWerk.Name" />
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="() => showNewWerk = false">Abbrechen</button>
                     <button type="button" class="btn btn-primary" @onclick="SaveNewWerk">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showNewKomponist)
+{
+    <div class="modal-backdrop show" style="z-index: 1060;"></div>
+    <div class="modal show d-block" tabindex="-1" style="z-index: 1070;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Neuer Komponist</h5>
+                    <button type="button" class="btn-close" @onclick="() => showNewKomponist = false"></button>
+                </div>
+                <div class="modal-body">
+                    <input class="form-control mb-2" placeholder="Vorname" @bind="newKomponist.Vorname" />
+                    <input class="form-control mb-2" placeholder="Name" @bind="newKomponist.Name" />
+                    <div class="mb-2">
+                        <label>Geboren:</label>
+                        <input type="date" class="form-control" @bind="newKomponist.Born" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Notiz:</label>
+                        <textarea class="form-control" rows="3" @bind="newKomponist.Note"></textarea>
+                    </div>
+                    <div class="mb-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillKomponistAi">AI Vervollständigen</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showNewKomponist = false">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveNewKomponist">Speichern</button>
                 </div>
             </div>
         </div>
@@ -311,12 +361,14 @@
     private bool showNewDirigent = false;
     private bool showNewSolist = false;
     private bool showNewWerk = false;
+    private bool showNewKomponist = false;
 
     // Temporary objects for creation
     private Orchester newOrchester = new();
     private Dirigent newDirigent = new();
     private Solist newSolist = new();
     private Werk newWerk = new();
+    private Komponist newKomponist = new();
 
     // Selection State for Add to List
     private int selectedWerkToAddId;
@@ -391,6 +443,54 @@
         }
     }
 
+    private async Task FillSolistAi()
+    {
+         if (string.IsNullOrWhiteSpace(newSolist.Name))
+        {
+             await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Namen ein.");
+             return;
+        }
+
+        try
+        {
+            string fullName = $"{newSolist.Vorname} {newSolist.Name}".Trim();
+            var result = await AiService.RequestAiData(fullName, "Solist");
+            if (result is AiSolistResponseDto dto)
+            {
+                newSolist.Born = dto.Born;
+                newSolist.Note = dto.Note;
+            }
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+        }
+    }
+
+    private async Task FillKomponistAi()
+    {
+         if (string.IsNullOrWhiteSpace(newKomponist.Name))
+        {
+             await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Namen ein.");
+             return;
+        }
+
+        try
+        {
+            string fullName = $"{newKomponist.Vorname} {newKomponist.Name}".Trim();
+            var result = await AiService.RequestAiData(fullName, "Komponist");
+            if (result is AiKomponistResponseDto dto)
+            {
+                newKomponist.Born = dto.Born;
+                newKomponist.Note = dto.Note;
+            }
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+        }
+    }
+
     // --- Save Helpers ---
 
     private async Task SaveNewOrchester()
@@ -456,6 +556,21 @@
 
             newWerk = new();
             showNewWerk = false;
+        }
+    }
+
+    private async Task SaveNewKomponist()
+    {
+        if (!string.IsNullOrWhiteSpace(newKomponist.Name))
+        {
+            await Service.AddKomponist(newKomponist);
+            LoadLists();
+
+            // Auto-select the new one in the New Werk modal
+            newWerk.KomponistId = newKomponist.Id;
+
+            newKomponist = new();
+            showNewKomponist = false;
         }
     }
 
