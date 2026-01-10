@@ -298,6 +298,13 @@
                         </div>
                     </div>
                     <input class="form-control" placeholder="Werk Name" @bind="newWerk.Name" />
+                    <div class="mb-2 mt-2">
+                        <label>Notiz:</label>
+                        <textarea class="form-control" rows="3" @bind="newWerk.Note"></textarea>
+                    </div>
+                    <div class="mb-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillWerkAi">AI Vervollständigen</button>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="() => showNewWerk = false">Abbrechen</button>
@@ -488,6 +495,42 @@
         catch (Exception ex)
         {
              await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+        }
+    }
+
+    private async Task FillWerkAi()
+    {
+        if (string.IsNullOrWhiteSpace(newWerk.Name))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Werknamen ein.");
+            return;
+        }
+
+        if (newWerk.KomponistId == null || newWerk.KomponistId == 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Bitte wählen Sie zuerst einen Komponisten aus.");
+            return;
+        }
+
+        try
+        {
+            var selectedKomponist = KomponistenList.FirstOrDefault(k => k.Id == newWerk.KomponistId);
+            string komponistName = selectedKomponist != null
+                ? $"{selectedKomponist.Vorname} {selectedKomponist.Name}".Trim()
+                : "Unknown";
+
+            // Argument are Name and Komponist
+            string query = $"{newWerk.Name} by {komponistName}";
+
+            var result = await AiService.RequestAiData(query, "Werk");
+            if (result is AiWerkResponseDto dto)
+            {
+                newWerk.Note = dto.Note;
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
         }
     }
 
