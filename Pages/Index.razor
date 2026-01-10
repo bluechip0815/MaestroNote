@@ -8,6 +8,7 @@
 @using static MaestroNotes.Data.MusicService
 
 @inject MusicService Service
+@inject AiService AiService
 @inject IJSRuntime JS
 
 <PageTitle>Meine Konzerte</PageTitle>
@@ -409,6 +410,9 @@ else
                         <label>Notiz</label>
                         <textarea class="form-control" rows="3" @bind="d.Note"></textarea>
                     </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
+                    </div>
                 }
                 else if (MasterType == "Solist")
                 {
@@ -430,6 +434,9 @@ else
                     <div class="mt-2">
                         <label>Notiz</label>
                         <textarea class="form-control" rows="3" @bind="s.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
                     </div>
                 }
                 else if (MasterType == "Komponist")
@@ -453,6 +460,9 @@ else
                         <label>Notiz</label>
                         <textarea class="form-control" rows="3" @bind="k.Note"></textarea>
                     </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
+                    </div>
                 }
                 else if (MasterType == "Orchester")
                 {
@@ -466,6 +476,9 @@ else
                     <div class="mt-2">
                         <label>Notiz</label>
                         <textarea class="form-control" rows="3" @bind="o.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
                     </div>
                 }
                 else if (MasterType == "Werk")
@@ -487,6 +500,9 @@ else
                     <div class="mt-2">
                         <label>Notiz</label>
                         <textarea class="form-control" rows="3" @bind="w.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
                     </div>
                 }
             </div>
@@ -821,6 +837,64 @@ else
         ShowMasterEditModal = false;
         EditMasterItem = null;
         return Task.CompletedTask;
+    }
+
+    private async Task FillMasterAi()
+    {
+        if (EditMasterItem == null) return;
+
+        string name = "";
+        try
+        {
+            switch (MasterType)
+            {
+                case "Dirigent":
+                    var d = (Dirigent)EditMasterItem;
+                    name = $"{d.Vorname} {d.Name}".Trim();
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var dRes = await AiService.RequestAiData(name, "Dirigent") as AiDirigentResponseDto;
+                    if (dRes != null) { d.Born = dRes.Born; d.Note = dRes.Note; }
+                    break;
+                case "Solist":
+                    var s = (Solist)EditMasterItem;
+                    name = $"{s.Vorname} {s.Name}".Trim();
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var sRes = await AiService.RequestAiData(name, "Solist") as AiSolistResponseDto;
+                    if (sRes != null) { s.Born = sRes.Born; s.Note = sRes.Note; }
+                    break;
+                case "Komponist":
+                    var k = (Komponist)EditMasterItem;
+                    name = $"{k.Vorname} {k.Name}".Trim();
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var kRes = await AiService.RequestAiData(name, "Komponist") as AiKomponistResponseDto;
+                    if (kRes != null) { k.Born = kRes.Born; k.Note = kRes.Note; }
+                    break;
+                case "Orchester":
+                    var o = (Orchester)EditMasterItem;
+                    name = o.Name;
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var oRes = await AiService.RequestAiData(name, "Orchester") as AiOrchesterResponseDto;
+                    if (oRes != null) { o.Founded = oRes.Founded; o.Note = oRes.Note; }
+                    break;
+                case "Werk":
+                    var w = (Werk)EditMasterItem;
+                    name = w.Name;
+                    if (w.KomponistId != null)
+                    {
+                        var comp = AllKomponisten.FirstOrDefault(c => c.Id == w.KomponistId);
+                        if (comp != null) name += $" ({comp.Vorname} {comp.Name})";
+                    }
+
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var wRes = await AiService.RequestAiData(name, "Werk") as AiWerkResponseDto;
+                    if (wRes != null) { w.Note = wRes.Note; }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+             await JS.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+        }
     }
 
     private async Task SaveMasterItem()
