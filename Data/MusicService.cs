@@ -460,8 +460,13 @@ namespace MaestroNotes.Data
                 .ToList();
         }
 
+        private List<string>? _spielSaisonCache;
+
         public List<string> GetSpielSaisonList()
         {
+            if (_spielSaisonCache != null)
+                return _spielSaisonCache;
+
             var list = _context.MusicRecords
                 .Select(m => m.Spielsaison)
                 .Where(s => !string.IsNullOrEmpty(s))
@@ -475,7 +480,9 @@ namespace MaestroNotes.Data
                 list.Add(currentSeason);
                 list.Sort();
             }
-            return list;
+
+            _spielSaisonCache = list;
+            return _spielSaisonCache;
         }
 
         public List<string> GetUsedSaisons()
