@@ -50,6 +50,7 @@ class MigrationSpecialist:
         # Key: Normalized String, Value: ID in DB
         self.cache = {'dirigent': {}, 'orchester': {}, 'komponist': {}, 'werk': {}, 'solist': {}, 'ort': {}}
         self.correction_map = {}
+        self.todo_counter = 1
 
     def normalize_name(self, name):
         """
@@ -80,6 +81,27 @@ class MigrationSpecialist:
         parts = full_name.strip().split(' ')
         if len(parts) == 1: return "", parts[0]
         return " ".join(parts[:-1]), parts[-1]
+
+    def split_komponist_string(self, val):
+        """
+        Splits Komponist string by '/', ',', and ' und '.
+        Returns a list of clean names.
+        """
+        if not val:
+            return []
+
+        # Replace ' und ' with special token or just unify splitters
+        # Use regex to split by:
+        # 1. '/'
+        # 2. ','
+        # 3. ' und ' (case insensitive)
+
+        # Pattern: \s*[/,]\s* | \s+und\s+ (case insensitive handled by re.IGNORECASE)
+        pattern = r"\s*[/,]\s*|\s+und\s+"
+        parts = re.split(pattern, val, flags=re.IGNORECASE)
+
+        # Clean up empty strings
+        return [p.strip() for p in parts if p.strip()]
 
     def load_correction_map(self, filepath):
         if not filepath: return
@@ -135,8 +157,12 @@ class MigrationSpecialist:
 
             process_value('dirigent', row['Dirigent'])
             process_value('orchester', row['Orchester'])
-            process_value('komponist', row['Komponist'])
             process_value('ort', row['Ort'])
+
+            # Komponist split handling
+            komponisten = self.split_komponist_string(row['Komponist'])
+            for komp in komponisten:
+                process_value('komponist', komp)
 
             # Solist special handling (comma separated)
             if row['Solist']:
@@ -182,36 +208,12 @@ class MigrationSpecialist:
             return self.cache[cache_key][norm_key]
 
         # 4. Insert (using the potentially corrected original value 'val_to_use')
-        # Note: 'params' passed in usually contains 'lookup_val' or parts of it.
-        # We need to re-derive params from 'val_to_use' if we modified it.
-        # This is tricky because params structure varies.
-        # Strategy: The caller passes 'params' derived from 'lookup_val'.
-        # If 'val_to_use' != 'lookup_val', we might need to recalc params.
-
-        # HOWEVER, the simplest way is to handle the param generation inside here or trust the caller?
-        # The caller calls this like: get_or_create(..., row['Dirigent'], "INSERT...", split_name(row['Dirigent']))
-        # If we change row['Dirigent'] to something else, the params are wrong.
-
-        # Solution: We can't easily patch 'params'.
-        # But we can assume that if we are doing normalization-based deduplication,
-        # we only insert the FIRST one encountered.
-        # The 'val_to_use' logic mainly helps if we have a manual override.
-
-        # If we have a manual override (val_to_use != lookup_val), we MUST generate new params.
-        # This requires knowing how to generate params for each type.
-
-        # Let's refactor `get_or_create` to take a param-generator function?
-        # Or just handle specific types inside here?
-        # Or let the caller handle the lookup logic?
-        # Caller handling is cleaner but repeats code.
-
-        # Let's do a pragmatic check:
+        # Check if params need update based on override
         final_params = params
         if val_to_use != lookup_val:
             # We need to regenerate params based on val_to_use
             if cache_key in ['dirigent', 'solist', 'komponist']:
                 # These use split_name
-                # Komponist also has an extra Note field (empty string)
                 parts = self.split_name(val_to_use)
                 if cache_key == 'komponist':
                     final_params = (*parts, "")
@@ -221,14 +223,7 @@ class MigrationSpecialist:
                 # These are just (Name,)
                 final_params = (val_to_use,)
             elif cache_key == 'werk':
-                # Werk params are (Name, KomponistId).
-                # Werk logic is handled separately in transfer usually because of KomponistId dependency.
-                # But here, 'lookup_val' for Werk is 'Name_KomponistId'.
-                # Normalization of Werk name is tricky.
-                # If we map 'WerkName' -> 'WerkNameCorrected', we just need the name part.
-                # But Werk key passed here is composite.
-                # Let's assume for Werk we rely on the caching primarily.
-                pass
+               pass
 
         self.new_cur.execute(insert_sql, final_params)
         new_id = self.new_cur.lastrowid
@@ -252,28 +247,57 @@ class MigrationSpecialist:
                 "INSERT INTO Orte (Name) VALUES (%s)", (row['Ort'],)) if row['Ort'] else None
 
             # 2. Komponist & Werk
-            w_id = None
+            w_ids = [] # List of Work IDs to link
+
             if row['Werk']:
-                k_id = self.get_or_create('komponist', row['Komponist'], 
-                    "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)", 
-                    (*self.split_name(row['Komponist']), "")) if row['Komponist'] else None
+                komp_strings = self.split_komponist_string(row['Komponist'])
                 
-                # Werk deduplication is complex because it depends on Komponist.
-                # We use the k_id we just resolved.
-                # But we should also normalize/map the Werk Name itself?
-                # User did not explicitly ask for Werk normalization, only Dirigent, Komponist, Solist, Orchester, Ort.
-                # But consistent behavior suggests we should at least check the map?
-                # The user list "Dirigent, Komponist, Solist, Orchester, Ort" excluded Werk. I will stick to that.
+                # Check if we have multiple composers or just one (or none if Komponist field was empty but Werk wasn't?)
+                # If Komponist empty, komp_strings is empty.
+                if not komp_strings:
+                     # Fallback: Work with no composer? Or skipped?
+                     # Original logic: if row['Komponist'] else None
+                     # If row['Komponist'] was empty, k_id was None.
+                     # But Werk table expects KomponistId?
+                     # Original SQL: INSERT INTO Werke ... VALUES (..., k_id) -> k_id can be None?
+                     # Check schema... usually nullable or fails.
+                     # Let's assume standard behavior: 1 Werk, No Composer.
+                     pass
 
-                werk_key = f"{row['Werk']}_{k_id}"
-                # We do NOT normalize Werk names per user scope, but we use the resolved k_id.
-                # However, get_or_create expects a cache key. We can use the raw key.
-                # Note: get_or_create logic above normalizes the key!
-                # If I pass 'Werk_123', normalize_name might mess it up?
-                # normalize_name("Missa_123") -> "missa_123". That's fine.
+                if len(komp_strings) <= 1:
+                    # Standard Case
+                    k_str = komp_strings[0] if komp_strings else None
+                    k_id = None
+                    if k_str:
+                        k_id = self.get_or_create('komponist', k_str,
+                            "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
+                            (*self.split_name(k_str), ""))
 
-                w_id = self.get_or_create('werk', werk_key, 
-                    "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (row['Werk'], k_id))
+                    werk_key = f"{row['Werk']}_{k_id}"
+                    w_id = self.get_or_create('werk', werk_key,
+                        "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (row['Werk'], k_id))
+                    w_ids.append(w_id)
+                else:
+                    # Multi-Composer Case -> Create "Todo X" Works for each
+                    for k_str in komp_strings:
+                        k_id = self.get_or_create('komponist', k_str,
+                            "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
+                            (*self.split_name(k_str), ""))
+
+                        # Create unique Todo work
+                        todo_name = f"Todo {self.todo_counter}"
+                        self.todo_counter += 1
+
+                        # We don't really deduplicate Todo works (they are unique by counter), but we use get_or_create for consistency or direct insert?
+                        # Using direct insert is safer to ensure uniqueness and not polluting cache with "Todo 1" etc if not needed?
+                        # But get_or_create handles the cache logic.
+                        # Cache key: "Todo 1_123".
+
+                        werk_key = f"{todo_name}_{k_id}"
+                        w_id = self.get_or_create('werk', werk_key,
+                             "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (todo_name, k_id))
+                        w_ids.append(w_id)
+
 
             # 3. MusicRecord Hauptdatensatz (OHNE die alten Spalten 'Werk'/'Komponist')
             bewertung = f"{row['Bewertung1']}\n{row['Bewertung2']}".strip()
@@ -281,18 +305,19 @@ class MigrationSpecialist:
                         (Id, Bezeichnung, Datum, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
             
-            # Als 'Bezeichnung' nehmen wir den Namen des Werks
+            # Als 'Bezeichnung' nehmen wir den Namen des Werks (Original String)
             self.new_cur.execute(sql_mr, (
                 row['Id'], row['Werk'], row['Datum'], row['Spielsaison'], 
                 bewertung, ort_id, d_id, o_id
             ))
 
             # 4. n:m Beziehung: MusicRecord <-> Werk
-            if w_id:
-                self.new_cur.execute(
-                    "INSERT INTO MusicRecordWerk (MusicRecordsId, WerkeId) VALUES (%s, %s)", 
-                    (row['Id'], w_id)
-                )
+            for w_id in w_ids:
+                if w_id:
+                    self.new_cur.execute(
+                        "INSERT INTO MusicRecordWerk (MusicRecordsId, WerkeId) VALUES (%s, %s)",
+                        (row['Id'], w_id)
+                    )
 
             # 5. n:m Beziehung: MusicRecord <-> Solisten
             if row['Solist']:
