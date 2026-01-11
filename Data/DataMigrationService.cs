@@ -16,7 +16,10 @@ namespace MaestroNotes.Data
 
             // If Werke table is empty, we assume migration is needed.
             if (context.Werke.Any())
+            {
+                // Orte migration is now handled in DB migration script
                 return; // Already migrated
+            }
 
             context.SaveChanges();
         }

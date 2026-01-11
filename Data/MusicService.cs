@@ -11,7 +11,6 @@ namespace MaestroNotes.Data
             _context = context;
             try
             {
-                //DefaultLists.Init(context);
                 Log.Logger.Information("MusicService constructed");
             }
             catch (Exception ex) 
@@ -35,6 +34,7 @@ namespace MaestroNotes.Data
             var query = _context.MusicRecords
                 .Include(m => m.Dirigent)
                 .Include(m => m.Orchester)
+                .Include(m => m.OrtEntity)
                 .Include(m => m.Werke).ThenInclude(w => w.Komponist)
                 .Include(m => m.Solisten)
                 .AsQueryable();
@@ -65,7 +65,7 @@ namespace MaestroNotes.Data
                         break;
                     case "Ort":
                         if (!string.IsNullOrEmpty(searchTerm))
-                            query = query.Where(m => m.Ort == searchTerm);
+                            query = query.Where(m => m.OrtEntity != null && m.OrtEntity.Name == searchTerm);
                         break;
                     case "Saisson":
                         if (!string.IsNullOrEmpty(searchTerm))
@@ -101,7 +101,7 @@ namespace MaestroNotes.Data
                 Id = m.Id,
                 Datum = m.Datum,
                 Spielsaison = m.Spielsaison,
-                Ort = m.Ort,
+                Ort = m.OrtEntity?.Name ?? "",
                 Bewertung = m.Bewertung,
                 KomponistNames = string.Join(", ", m.Werke.Select(w => w.Komponist?.Name ?? "").Where(s => !string.IsNullOrEmpty(s))),
                 WerkNames = string.Join(", ", m.Werke.Select(w => w.Name)),
@@ -149,6 +149,7 @@ namespace MaestroNotes.Data
             return _context.MusicRecords
                 .Include(m => m.Dirigent)
                 .Include(m => m.Orchester)
+                .Include(m => m.OrtEntity)
                 .Include(m => m.Werke).ThenInclude(w => w.Komponist)
                 .Include(m => m.Solisten)
                 .FirstOrDefault(m => m.Id == id);
@@ -356,6 +357,7 @@ namespace MaestroNotes.Data
         public List<Orchester> GetAllOrchester() => _context.Orchester.ToList();
         public List<Dirigent> GetAllDirigenten() => _context.Dirigenten.ToList();
         public List<Solist> GetAllSolisten() => _context.Solisten.ToList();
+        public List<Ort> GetAllOrte() => _context.Orte.ToList();
 
         // NoTracking variants for Master Data Management to avoid context tracking conflicts
         public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().ToList();
@@ -363,6 +365,7 @@ namespace MaestroNotes.Data
         public List<Orchester> GetAllOrchesterNoTracking() => _context.Orchester.AsNoTracking().ToList();
         public List<Dirigent> GetAllDirigentenNoTracking() => _context.Dirigenten.AsNoTracking().ToList();
         public List<Solist> GetAllSolistenNoTracking() => _context.Solisten.AsNoTracking().ToList();
+        public List<Ort> GetAllOrteNoTracking() => _context.Orte.AsNoTracking().ToList();
 
         public async Task AddKomponist(Komponist k)
         {
@@ -387,6 +390,12 @@ namespace MaestroNotes.Data
         public async Task AddSolist(Solist s)
         {
             _context.Solisten.Add(s);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task AddOrt(Ort o)
+        {
+            _context.Orte.Add(o);
             await _context.SaveChangesAsync();
         }
 
@@ -444,22 +453,34 @@ namespace MaestroNotes.Data
 
         public List<string> GetUsedOrte()
         {
-            return _context.MusicRecords
-                .Select(m => m.Ort)
-                .Where(s => !string.IsNullOrEmpty(s))
+            return _context.Orte
+                .Select(o => o.Name)
                 .Distinct()
                 .OrderBy(n => n)
                 .ToList();
         }
 
-        public List<string> GetUsedSaisons()
+        public List<string> GetSpielSaisonList()
         {
-            return _context.MusicRecords
+            var list = _context.MusicRecords
                 .Select(m => m.Spielsaison)
                 .Where(s => !string.IsNullOrEmpty(s))
                 .Distinct()
                 .OrderBy(n => n)
                 .ToList();
+
+            string currentSeason = $"{DateTime.UtcNow.Year}/{(DateTime.UtcNow.Year + 1) % 100}";
+            if (!list.Contains(currentSeason))
+            {
+                list.Add(currentSeason);
+                list.Sort();
+            }
+            return list;
+        }
+
+        public List<string> GetUsedSaisons()
+        {
+            return GetSpielSaisonList();
         }
 
         // --- SPEZIFISCHE LOGIK (Bleibt wie sie ist) ---

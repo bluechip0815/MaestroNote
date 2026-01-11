@@ -128,6 +128,7 @@
                         <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Solist")'>Solist</a></li>
                         <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Werk")'>Werk</a></li>
                         <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Komponist")'>Komponist</a></li>
+                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Ort")'>Ort</a></li>
                     </ul>
                 </div>
                 <button class="btn btn-primary" @onclick="() => AddNew()" title="Neuer Eintrag">
@@ -364,6 +365,11 @@ else
                                 var o = (Orchester)item;
                                 <td>@o.Name</td>
                             }
+                            else if (MasterType == "Ort")
+                            {
+                                var o = (Ort)item;
+                                <td>@o.Name</td>
+                            }
                             else if (MasterType == "Werk")
                             {
                                 var w = (Werk)item;
@@ -473,6 +479,19 @@ else
                         <label>Gegründet</label>
                         <input type="date" class="form-control" @bind="o.Founded" />
                     </div>
+                    <div class="mt-2">
+                        <label>Notiz</label>
+                        <textarea class="form-control" rows="3" @bind="o.Note"></textarea>
+                    </div>
+                    <div class="mt-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillMasterAi">AI Vervollständigen</button>
+                    </div>
+                }
+                else if (MasterType == "Ort")
+                {
+                    var o = (Ort)EditMasterItem;
+                    <label>Name</label>
+                    <input type="text" class="form-control" @bind="o.Name" />
                     <div class="mt-2">
                         <label>Notiz</label>
                         <textarea class="form-control" rows="3" @bind="o.Note"></textarea>
@@ -789,6 +808,9 @@ else
             case "Komponist":
                 MasterList = Service.GetAllKomponistenNoTracking().Cast<object>().ToList();
                 break;
+            case "Ort":
+                MasterList = Service.GetAllOrteNoTracking().Cast<object>().ToList();
+                break;
         }
     }
 
@@ -826,6 +848,9 @@ else
                 break;
             case "Komponist":
                 EditMasterItem = JsonSerializer.Deserialize<Komponist>(json, options);
+                break;
+            case "Ort":
+                EditMasterItem = JsonSerializer.Deserialize<Ort>(json, options);
                 break;
         }
 
@@ -875,6 +900,13 @@ else
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var oRes = await AiService.RequestAiData(name, "Orchester") as AiOrchesterResponseDto;
                     if (oRes != null) { o.Founded = oRes.Founded; o.Note = oRes.Note; }
+                    break;
+                case "Ort":
+                    var ort = (Ort)EditMasterItem;
+                    name = ort.Name;
+                    if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
+                    var ortRes = await AiService.RequestAiData(name, "Ort") as AiOrtResponseDto;
+                    if (ortRes != null) { ort.Note = ortRes.Note; }
                     break;
                 case "Werk":
                     var w = (Werk)EditMasterItem;

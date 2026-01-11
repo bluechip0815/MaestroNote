@@ -35,6 +35,11 @@ namespace MaestroNotes.Data
         public string? Note { get; set; }
     }
 
+    public class AiOrtResponseDto
+    {
+        public string? Note { get; set; }
+    }
+
     public class AiService
     {
         private readonly IAiProvider _aiProvider;
@@ -84,6 +89,11 @@ namespace MaestroNotes.Data
             {
                 targetType = typeof(AiWerkResponseDto);
                 jsonStructure = JsonSerializer.Serialize(new AiWerkResponseDto { Note = "Example Note" });
+            }
+            else if (itemType.Equals("Ort", StringComparison.OrdinalIgnoreCase))
+            {
+                targetType = typeof(AiOrtResponseDto);
+                jsonStructure = JsonSerializer.Serialize(new AiOrtResponseDto { Note = "Example Note" });
             }
             else
             {

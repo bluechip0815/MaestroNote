@@ -18,9 +18,6 @@ namespace MaestroNotes.Data
         [MaxLength(2000)]
         public string Bewertung { get; set; } = "";
 
-        [MaxLength(64)]
-        public string Ort { get; set; } = "";
-
         // Relationships
         public int? DirigentId { get; set; }
         [ForeignKey("DirigentId")]
@@ -29,6 +26,10 @@ namespace MaestroNotes.Data
         public int? OrchesterId { get; set; }
         [ForeignKey("OrchesterId")]
         public Orchester? Orchester { get; set; }
+
+        public int? OrtId { get; set; }
+        [ForeignKey("OrtId")]
+        public Ort? OrtEntity { get; set; }
 
         public List<Werk> Werke { get; set; } = new();
 
@@ -46,31 +47,15 @@ namespace MaestroNotes.Data
             Orchester = n.Orchester;
             OrchesterId = n.OrchesterId;
 
+            OrtEntity = n.OrtEntity;
+            OrtId = n.OrtId;
+
             Werke = n.Werke;
             Solisten = n.Solisten;
 
             Datum = n.Datum;
             Bewertung = n.Bewertung;
-            Ort = n.Ort;
             Spielsaison = n.Spielsaison;
-        }
-
-        public bool Find(string filter)
-        {
-            // Search in new fields
-            if (Bezeichnung.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Ort.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Spielsaison.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Bewertung.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-
-            // Search in linked entities
-            if (Dirigent?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
-            if (Orchester?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
-            if (Werke.Any(w => w.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
-                            || (w.Komponist?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true))) return true;
-            if (Solisten.Any(s => s.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase))) return true;
-
-            return false;
         }
     }
 }
