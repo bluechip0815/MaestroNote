@@ -57,23 +57,5 @@ namespace MaestroNotes.Data
             Bewertung = n.Bewertung;
             Spielsaison = n.Spielsaison;
         }
-
-        public bool Find(string filter)
-        {
-            // Search in new fields
-            if (Bezeichnung.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Spielsaison.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Bewertung.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-
-            // Search in linked entities
-            if (Dirigent?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
-            if (Orchester?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
-            if (OrtEntity?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
-            if (Werke.Any(w => w.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
-                            || (w.Komponist?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true))) return true;
-            if (Solisten.Any(s => s.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase))) return true;
-
-            return false;
-        }
     }
 }
