@@ -30,6 +30,10 @@ namespace MaestroNotes.Data
         [ForeignKey("OrchesterId")]
         public Orchester? Orchester { get; set; }
 
+        public int? OrtId { get; set; }
+        [ForeignKey("OrtId")]
+        public Ort? OrtEntity { get; set; }
+
         public List<Werk> Werke { get; set; } = new();
 
         public List<Solist> Solisten { get; set; } = new();
@@ -45,6 +49,9 @@ namespace MaestroNotes.Data
 
             Orchester = n.Orchester;
             OrchesterId = n.OrchesterId;
+
+            OrtEntity = n.OrtEntity;
+            OrtId = n.OrtId;
 
             Werke = n.Werke;
             Solisten = n.Solisten;
@@ -66,6 +73,7 @@ namespace MaestroNotes.Data
             // Search in linked entities
             if (Dirigent?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
             if (Orchester?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
+            if (OrtEntity?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true) return true;
             if (Werke.Any(w => w.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
                             || (w.Komponist?.Name?.Contains(filter, StringComparison.CurrentCultureIgnoreCase) == true))) return true;
             if (Solisten.Any(s => s.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase))) return true;

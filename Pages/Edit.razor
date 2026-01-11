@@ -127,8 +127,23 @@
     <!-- OTHER FIELDS -->
     <div class="form-group mt-3">
         <label for="Ort">Ort:</label>
-        <InputText id="Ort" class="form-control" @bind-Value="currentRecord.Ort" />
-        <ValidationMessage For="@(() => currentRecord.Ort)" />
+        <div class="row">
+            <div class="col-sm-10">
+                <select id="Ort" class="form-control" @bind="currentRecord.OrtId">
+                    <option value="">(None)</option>
+                    @foreach (var o in OrteList)
+                    {
+                        <option value="@o.Id">@o.Name</option>
+                    }
+                </select>
+                <ValidationMessage For="@(() => currentRecord.OrtId)" />
+            </div>
+            <div class="col-sm-2">
+                 <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewOrt = true">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
     </div>
 
     <div class="form-group mt-2">
@@ -141,7 +156,7 @@
         <div class="col-md-6 form-group">
             <label for="Spielsaison">Spielsaison:</label>
             <select id="Spielsaison" class="form-control" @bind="currentRecord.Spielsaison">
-                @foreach(string n in DefaultLists.SpielSaisonList)
+                @foreach(string n in Service.GetSpielSaisonList())
                 {
                     if (n!="")
                     {
@@ -197,6 +212,35 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="() => showNewOrchester = false">Abbrechen</button>
                     <button type="button" class="btn btn-primary" @onclick="SaveNewOrchester">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showNewOrt)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Neuer Ort</h5>
+                    <button type="button" class="btn-close" @onclick="() => showNewOrt = false"></button>
+                </div>
+                <div class="modal-body">
+                    <input class="form-control mb-2" placeholder="Name" @bind="newOrt.Name" />
+                    <div class="mb-2">
+                        <label>Notiz:</label>
+                        <textarea class="form-control" rows="3" @bind="newOrt.Note"></textarea>
+                    </div>
+                    <div class="mb-2">
+                         <button type="button" class="btn btn-sm btn-info" @onclick="FillOrtAi">AI Vervollständigen</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showNewOrt = false">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveNewOrt">Speichern</button>
                 </div>
             </div>
         </div>
@@ -362,6 +406,7 @@
     private List<Solist> SolistenList = new();
     private List<Werk> WerkeList = new();
     private List<Komponist> KomponistenList = new();
+    private List<Ort> OrteList = new();
 
     // UI State for Modals
     private bool showNewOrchester = false;
@@ -369,6 +414,7 @@
     private bool showNewSolist = false;
     private bool showNewWerk = false;
     private bool showNewKomponist = false;
+    private bool showNewOrt = false;
 
     // Temporary objects for creation
     private Orchester newOrchester = new();
@@ -376,6 +422,7 @@
     private Solist newSolist = new();
     private Werk newWerk = new();
     private Komponist newKomponist = new();
+    private Ort newOrt = new();
 
     // Selection State for Add to List
     private int selectedWerkToAddId;
@@ -393,6 +440,7 @@
         SolistenList = Service.GetAllSolisten();
         WerkeList = Service.GetAllWerke();
         KomponistenList = Service.GetAllKomponisten();
+        OrteList = Service.GetAllOrte();
     }
 
     private void Close(bool result)
@@ -495,6 +543,28 @@
         catch (Exception ex)
         {
              await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+        }
+    }
+
+    private async Task FillOrtAi()
+    {
+        if (string.IsNullOrWhiteSpace(newOrt.Name))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Namen ein.");
+            return;
+        }
+
+        try
+        {
+            var result = await AiService.RequestAiData(newOrt.Name, "Ort");
+            if (result is AiOrtResponseDto dto)
+            {
+                newOrt.Note = dto.Note;
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
         }
     }
 
@@ -614,6 +684,19 @@
 
             newKomponist = new();
             showNewKomponist = false;
+        }
+    }
+
+    private async Task SaveNewOrt()
+    {
+        if (!string.IsNullOrWhiteSpace(newOrt.Name))
+        {
+            await Service.AddOrt(newOrt);
+            LoadLists();
+
+            currentRecord.OrtId = newOrt.Id;
+            newOrt = new();
+            showNewOrt = false;
         }
     }
 

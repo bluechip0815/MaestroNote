@@ -11,6 +11,7 @@ namespace MaestroNotes.Data
         public DbSet<Solist> Solisten { get; set; }
         public DbSet<Orchester> Orchester { get; set; }
         public DbSet<Werk> Werke { get; set; }
+        public DbSet<Ort> Orte { get; set; }
 
         public string DocumentsPath { get; set; } = "";
         public string ImagesPath { get; set; } = "";
