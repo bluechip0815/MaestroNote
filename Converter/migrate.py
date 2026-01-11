@@ -115,14 +115,18 @@ class MigrationSpecialist:
 
             # 5. n:m Beziehung: MusicRecord <-> Solisten
             if row['Solist']:
-                for s_full in [s.strip() for s in row['Solist'].split(',')]:
-                    s_id = self.get_or_create('solist', s_full, 
-                        "INSERT INTO Solisten (Vorname, Name) VALUES (%s, %s)", self.split_name(s_full))
-                    
-                    self.new_cur.execute(
-                        "INSERT INTO MusicRecordSolist (MusicRecordsId, SolistenId) VALUES (%s, %s)", 
-                        (row['Id'], s_id)
-                    )
+                # Clean string before splitting: remove 'u.a.'/'u. a.', then trim
+                solist_clean = row['Solist'].replace("u.a.", "").replace("u. a.", "").strip()
+                if solist_clean:
+                    for s_full in [s.strip() for s in solist_clean.split(',')]:
+                        if not s_full: continue
+                        s_id = self.get_or_create('solist', s_full,
+                            "INSERT INTO Solisten (Vorname, Name) VALUES (%s, %s)", self.split_name(s_full))
+
+                        self.new_cur.execute(
+                            "INSERT INTO MusicRecordSolist (MusicRecordsId, SolistenId) VALUES (%s, %s)",
+                            (row['Id'], s_id)
+                        )
 
         # 6. Documents
         print("📂 Migriere Dokumente...")
