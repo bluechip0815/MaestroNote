@@ -37,7 +37,7 @@ class MigrationSpecialist:
             sys.exit(1)
 
         # Caching um Duplikate in den Stammdaten zu vermeiden
-        self.cache = {'dirigent': {}, 'orchester': {}, 'komponist': {}, 'werk': {}, 'solist': {}}
+        self.cache = {'dirigent': {}, 'orchester': {}, 'komponist': {}, 'werk': {}, 'solist': {}, 'ort': {}}
 
     def split_name(self, full_name):
         if not full_name: return "", ""
@@ -50,7 +50,7 @@ class MigrationSpecialist:
         # EF Core Standard-Tabellennamen für n:m Beziehungen
         tables = [
             "MusicRecordSolist", "MusicRecordWerk", "MusicRecords", 
-            "Solisten", "Werke", "Komponisten", "Orchester", "Dirigenten"
+            "Solisten", "Werke", "Komponisten", "Orchester", "Dirigenten", "Orte", "Documents"
         ]
         self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
         for table in tables:
@@ -80,6 +80,9 @@ class MigrationSpecialist:
             o_id = self.get_or_create('orchester', row['Orchester'], 
                 "INSERT INTO Orchester (Name) VALUES (%s)", (row['Orchester'],)) if row['Orchester'] else None
 
+            ort_id = self.get_or_create('ort', row['Ort'],
+                "INSERT INTO Orte (Name) VALUES (%s)", (row['Ort'],)) if row['Ort'] else None
+
             # 2. Komponist & Werk
             w_id = None
             if row['Werk']:
@@ -94,13 +97,13 @@ class MigrationSpecialist:
             # 3. MusicRecord Hauptdatensatz (OHNE die alten Spalten 'Werk'/'Komponist')
             bewertung = f"{row['Bewertung1']}\n{row['Bewertung2']}".strip()
             sql_mr = """INSERT INTO MusicRecords 
-                        (Id, Bezeichnung, Datum, Spielsaison, Bewertung, Ort, DirigentId, OrchesterId) 
+                        (Id, Bezeichnung, Datum, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
             
             # Als 'Bezeichnung' nehmen wir den Namen des Werks
             self.new_cur.execute(sql_mr, (
                 row['Id'], row['Werk'], row['Datum'], row['Spielsaison'], 
-                bewertung, row['Ort'], d_id, o_id
+                bewertung, ort_id, d_id, o_id
             ))
 
             # 4. n:m Beziehung: MusicRecord <-> Werk
@@ -112,17 +115,32 @@ class MigrationSpecialist:
 
             # 5. n:m Beziehung: MusicRecord <-> Solisten
             if row['Solist']:
-                for s_full in [s.strip() for s in row['Solist'].split(',')]:
-                    s_id = self.get_or_create('solist', s_full, 
-                        "INSERT INTO Solisten (Vorname, Name) VALUES (%s, %s)", self.split_name(s_full))
-                    
-                    self.new_cur.execute(
-                        "INSERT INTO MusicRecordSolist (MusicRecordsId, SolistenId) VALUES (%s, %s)", 
-                        (row['Id'], s_id)
-                    )
+                # Clean string before splitting: remove 'u.a.'/'u. a.', then trim
+                solist_clean = row['Solist'].replace("u.a.", "").replace("u. a.", "").strip()
+                if solist_clean:
+                    for s_full in [s.strip() for s in solist_clean.split(',')]:
+                        if not s_full: continue
+                        s_id = self.get_or_create('solist', s_full,
+                            "INSERT INTO Solisten (Vorname, Name) VALUES (%s, %s)", self.split_name(s_full))
+
+                        self.new_cur.execute(
+                            "INSERT INTO MusicRecordSolist (MusicRecordsId, SolistenId) VALUES (%s, %s)",
+                            (row['Id'], s_id)
+                        )
+
+        # 6. Documents
+        print("📂 Migriere Dokumente...")
+        self.old_cur.execute("SELECT * FROM Documents")
+        old_docs = self.old_cur.fetchall()
+
+        for doc in old_docs:
+            self.new_cur.execute(
+                "INSERT INTO Documents (Id, FileName, EncryptedName, DocumentType, MusicRecordId) VALUES (%s, %s, %s, %s, %s)",
+                (doc['Id'], doc['FileName'], doc['EncryptedName'], doc['DocumentType'], doc['MusicRecordId'])
+            )
 
         self.new_conn.commit()
-        print(f"✅ Fertig! {len(old_data)} Records migriert.")
+        print(f"✅ Fertig! {len(old_data)} Records und {len(old_docs)} Dokumente migriert.")
 
     def close(self):
         self.old_cur.close(); self.new_cur.close()
