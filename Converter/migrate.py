@@ -49,6 +49,9 @@ class MigrationSpecialist:
         # Caching um Duplikate in den Stammdaten zu vermeiden
         # Key: Normalized String, Value: ID in DB
         self.cache = {'dirigent': {}, 'orchester': {}, 'komponist': {}, 'werk': {}, 'solist': {}, 'ort': {}}
+        # Lookup for "Name only" ambiguity resolution
+        # Structure: { category: { normalized_lastname: [set of normalized_fullnames] } }
+        self.name_index = {'dirigent': {}, 'komponist': {}, 'solist': {}}
         self.correction_map = {}
         self.todo_counter = 1
 
@@ -90,17 +93,9 @@ class MigrationSpecialist:
         if not val:
             return []
 
-        # Replace ' und ' with special token or just unify splitters
-        # Use regex to split by:
-        # 1. '/'
-        # 2. ','
-        # 3. ' und ' (case insensitive)
-
-        # Pattern: \s*[/,]\s* | \s+und\s+ (case insensitive handled by re.IGNORECASE)
         pattern = r"\s*[/,]\s*|\s+und\s+"
         parts = re.split(pattern, val, flags=re.IGNORECASE)
 
-        # Clean up empty strings
         return [p.strip() for p in parts if p.strip()]
 
     def load_correction_map(self, filepath):
@@ -117,64 +112,106 @@ class MigrationSpecialist:
             print(f"❌ Fehler beim Laden der Korrektur-Map: {e}")
 
     def generate_correction_map(self, output_path):
-        print("🔍 Analysiere Daten auf Duplikate...")
+        print("🔍 Analysiere Daten auf Duplikate und Ambiguities...")
 
-        # Dictionary: category -> { normalized_key -> first_seen_original }
-        seen_normalized = {
-            'dirigent': {},
-            'orchester': {},
-            'komponist': {},
-            'solist': {},
-            'ort': {}
-        }
+        # 1. Pass: Collect all normalized names to detect ambiguities
+        # We need to scan all data to build the name index FIRST
+        # because "Müller" might appear before "Thomas Müller".
 
-        duplicates_map = {} # { "Duplicate Spelling": "First Spelling" }
+        temp_name_index = {'dirigent': {}, 'komponist': {}, 'solist': {}}
+        all_values = {'dirigent': [], 'komponist': [], 'solist': [], 'orchester': [], 'ort': []} # To avoid re-reading DB cursor if possible, or just store sets?
 
+        # We'll read all into memory (dataset size seems manageable given context)
         self.old_cur.execute("SELECT * FROM MusicRecords")
         old_data = self.old_cur.fetchall()
 
-        count_duplicates = 0
+        # Helper to collect full names
+        def collect_full_names(category, val):
+            if not val: return
+            norm = self.normalize_name(val)
+            if not norm: return
 
+            # Store raw val for later duplicate check
+            all_values[category].append(val)
+
+            # If category supports name/vorname split
+            if category in ['dirigent', 'komponist', 'solist']:
+                first, last = self.split_name(val)
+                if first: # Has a first name
+                    norm_last = self.normalize_name(last)
+                    if norm_last not in temp_name_index[category]:
+                        temp_name_index[category][norm_last] = set()
+                    temp_name_index[category][norm_last].add(norm) # Store full normalized name
+
+        # Pass 1: Build Index
         for row in old_data:
-            # Helper to process a value
-            def process_value(category, val):
-                if not val: return
-                norm = self.normalize_name(val)
-                if not norm: return
-
-                if norm in seen_normalized[category]:
-                    first_val = seen_normalized[category][norm]
-                    if first_val != val:
-                        # Found a duplicate!
-                        # Add to map: val -> first_val
-                        # But only if not already mapped or mapped differently
-                        if val not in duplicates_map:
-                            duplicates_map[val] = first_val
-                            nonlocal count_duplicates
-                            count_duplicates += 1
-                else:
-                    seen_normalized[category][norm] = val
-
-            process_value('dirigent', row['Dirigent'])
-            process_value('orchester', row['Orchester'])
-            process_value('ort', row['Ort'])
-
-            # Komponist split handling
-            komponisten = self.split_komponist_string(row['Komponist'])
-            for komp in komponisten:
-                process_value('komponist', komp)
-
-            # Solist special handling (comma separated)
+            collect_full_names('dirigent', row['Dirigent'])
+            # Komponist split
+            for k in self.split_komponist_string(row['Komponist']):
+                collect_full_names('komponist', k)
+            # Solist split
             if row['Solist']:
                 solist_clean = row['Solist'].replace("u.a.", "").replace("u. a.", "").strip()
-                if solist_clean:
-                    for s_full in [s.strip() for s in solist_clean.split(',')]:
-                        process_value('solist', s_full)
+                for s in [x.strip() for x in solist_clean.split(',')]:
+                    collect_full_names('solist', s)
 
-        print(f"✓ Analyse beendet. {count_duplicates} Duplikate gefunden.")
+            # Others (just for duplicate check later)
+            if row['Orchester']: all_values['orchester'].append(row['Orchester'])
+            if row['Ort']: all_values['ort'].append(row['Ort'])
+
+        duplicates_map = {}
+        seen_normalized = {c: {} for c in all_values.keys()}
+
+        # Pass 2: Detect Duplicates and Ambiguities
+        def check_value(category, val):
+            if not val: return
+            norm = self.normalize_name(val)
+            if not norm: return
+
+            # A. Check "Name Only" Ambiguity
+            if category in ['dirigent', 'komponist', 'solist']:
+                first, last = self.split_name(val)
+                if not first and last: # Name only
+                    norm_last = self.normalize_name(last)
+                    possible_matches = temp_name_index[category].get(norm_last, set())
+
+                    if len(possible_matches) > 1:
+                        # AMBIGUOUS
+                         duplicates_map[val] = f"AMBIGUOUS: {' | '.join(sorted(list(possible_matches)))}"
+                         return # Skip standard duplicate check? Or continue?
+                         # If ambiguous, we don't know which one it is, so we can't really "deduplicate" automatically.
+                    elif len(possible_matches) == 1:
+                         # UNIQUE MATCH
+                         # We can suggest mapping "Müller" -> "Thomas Müller"
+                         match = list(possible_matches)[0]
+                         # We need the original string of the match? 'match' is normalized.
+                         # This is tricky. We stored normalized strings in index.
+                         # The map expects { "Bad": "Good" }.
+                         # If we map "Müller" -> "thomas muller", the next run will normalize "thomas muller" and find ID.
+                         # This is acceptable? Yes.
+                         if val not in duplicates_map:
+                             duplicates_map[val] = match
+                         return
+
+            # B. Standard Deduplication
+            if norm in seen_normalized[category]:
+                first_val = seen_normalized[category][norm]
+                if first_val != val:
+                     if val not in duplicates_map:
+                         duplicates_map[val] = first_val
+            else:
+                seen_normalized[category][norm] = val
+
+        # Iterate again over the collected values (preserving order effectively)
+        for cat, vals in all_values.items():
+            for v in vals:
+                check_value(cat, v)
+
+        print(f"✓ Analyse beendet. {len(duplicates_map)} Einträge für Map gefunden.")
 
         try:
             with open(output_path, 'w', encoding='utf-8') as f:
+                # Convert sets to lists if any slipped in (shouldn't happen with current logic)
                 json.dump(duplicates_map, f, indent=4, ensure_ascii=False)
             print(f"💾 Map gespeichert unter: {output_path}")
         except Exception as e:
@@ -194,6 +231,21 @@ class MigrationSpecialist:
         self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
         self.new_conn.commit()
 
+    def update_name_index(self, category, full_name, db_id):
+        """
+        Updates the runtime name index when a new valid record with First+Last name is added.
+        """
+        if category not in self.name_index: return
+        first, last = self.split_name(full_name)
+        if first and last:
+            norm_last = self.normalize_name(last)
+            if norm_last not in self.name_index[category]:
+                self.name_index[category][norm_last] = []
+
+            # Store tuple of (normalized_full_name, db_id)
+            norm_full = self.normalize_name(full_name)
+            self.name_index[category][norm_last].append((norm_full, db_id))
+
     def get_or_create(self, cache_key, lookup_val, insert_sql, params):
         if not lookup_val: return None
 
@@ -207,20 +259,40 @@ class MigrationSpecialist:
         if norm_key in self.cache[cache_key]:
             return self.cache[cache_key][norm_key]
 
+        # 3b. Name-Only Lookup Logic (if not in cache)
+        if cache_key in ['dirigent', 'komponist', 'solist']:
+             first, last = self.split_name(val_to_use)
+             if not first and last: # No first name
+                 norm_last = self.normalize_name(last)
+                 candidates = self.name_index[cache_key].get(norm_last, [])
+
+                 # Logic: If exactly one match, use it.
+                 # Note: candidates contains (norm_full, id)
+                 # We need to filter duplicates in candidates list (same person might be added twice if logic fails elsewhere,
+                 # but actually we just want unique IDs or unique Names?)
+                 # Use a set of unique IDs found
+                 unique_ids = list({c[1] for c in candidates})
+
+                 if len(unique_ids) == 1:
+                     # Found unique match! Use this ID.
+                     # Also cache this "Short Name" -> ID mapping so next time it's fast
+                     found_id = unique_ids[0]
+                     self.cache[cache_key][norm_key] = found_id
+                     return found_id
+
+                 # If > 1: Ambiguous. We do nothing special, proceed to create new entry (or rely on later manual fix).
+                 # If 0: No match. Create new.
+
         # 4. Insert (using the potentially corrected original value 'val_to_use')
-        # Check if params need update based on override
         final_params = params
         if val_to_use != lookup_val:
-            # We need to regenerate params based on val_to_use
             if cache_key in ['dirigent', 'solist', 'komponist']:
-                # These use split_name
                 parts = self.split_name(val_to_use)
                 if cache_key == 'komponist':
                     final_params = (*parts, "")
                 else:
                     final_params = parts
             elif cache_key in ['orchester', 'ort']:
-                # These are just (Name,)
                 final_params = (val_to_use,)
             elif cache_key == 'werk':
                pass
@@ -228,6 +300,10 @@ class MigrationSpecialist:
         self.new_cur.execute(insert_sql, final_params)
         new_id = self.new_cur.lastrowid
         self.cache[cache_key][norm_key] = new_id
+
+        # Update name index with the new entry
+        self.update_name_index(cache_key, val_to_use, new_id)
+
         return new_id
 
     def transfer(self):
