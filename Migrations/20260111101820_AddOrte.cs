@@ -11,34 +11,6 @@ namespace MaestroNotes.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-/*            migrationBuilder.DropColumn(
-                name: "Bewertung1",
-                table: "MusicRecords");
-
-            migrationBuilder.DropColumn(
-                name: "Bewertung2",
-                table: "MusicRecords");
-
-            migrationBuilder.DropColumn(
-                name: "Dirigent",
-                table: "MusicRecords");
-
-            migrationBuilder.DropColumn(
-                name: "Komponist",
-                table: "MusicRecords");
-
-            migrationBuilder.DropColumn(
-                name: "Orchester",
-                table: "MusicRecords");
-
-            migrationBuilder.DropColumn(
-                name: "Solist",
-                table: "MusicRecords");
-
-            migrationBuilder.DropColumn(
-                name: "Werk",
-                table: "MusicRecords");
-*/
             migrationBuilder.AddColumn<int>(
                 name: "OrtId",
                 table: "MusicRecords",
@@ -73,11 +45,34 @@ namespace MaestroNotes.Migrations
                 column: "OrtId",
                 principalTable: "Orte",
                 principalColumn: "Id");
+
+            // Data Migration: Populate Orte from distinct strings
+            migrationBuilder.Sql("INSERT INTO Orte (Name) SELECT DISTINCT Ort FROM MusicRecords WHERE Ort IS NOT NULL AND Ort <> '';");
+
+            // Data Migration: Link MusicRecords to Orte
+            migrationBuilder.Sql("UPDATE MusicRecords m JOIN Orte o ON m.Ort = o.Name SET m.OrtId = o.Id;");
+
+            // Drop legacy column
+            migrationBuilder.DropColumn(
+                name: "Ort",
+                table: "MusicRecords");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<string>(
+                name: "Ort",
+                table: "MusicRecords",
+                type: "varchar(64)",
+                maxLength: 64,
+                nullable: false,
+                defaultValue: "")
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            // Restore data
+            migrationBuilder.Sql("UPDATE MusicRecords m JOIN Orte o ON m.OrtId = o.Id SET m.Ort = o.Name;");
+
             migrationBuilder.DropForeignKey(
                 name: "FK_MusicRecords_Orte_OrtId",
                 table: "MusicRecords");

@@ -18,9 +18,6 @@ namespace MaestroNotes.Data
         [MaxLength(2000)]
         public string Bewertung { get; set; } = "";
 
-        [MaxLength(64)]
-        public string Ort { get; set; } = "";
-
         // Relationships
         public int? DirigentId { get; set; }
         [ForeignKey("DirigentId")]
@@ -58,7 +55,6 @@ namespace MaestroNotes.Data
 
             Datum = n.Datum;
             Bewertung = n.Bewertung;
-            Ort = n.Ort;
             Spielsaison = n.Spielsaison;
         }
 
@@ -66,7 +62,6 @@ namespace MaestroNotes.Data
         {
             // Search in new fields
             if (Bezeichnung.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
-            if (Ort.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
             if (Spielsaison.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
             if (Bewertung.Contains(filter, StringComparison.CurrentCultureIgnoreCase)) return true;
 
