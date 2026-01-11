@@ -50,7 +50,7 @@ class MigrationSpecialist:
         # EF Core Standard-Tabellennamen für n:m Beziehungen
         tables = [
             "MusicRecordSolist", "MusicRecordWerk", "MusicRecords", 
-            "Solisten", "Werke", "Komponisten", "Orchester", "Dirigenten", "Orte"
+            "Solisten", "Werke", "Komponisten", "Orchester", "Dirigenten", "Orte", "Documents"
         ]
         self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
         for table in tables:
@@ -124,8 +124,19 @@ class MigrationSpecialist:
                         (row['Id'], s_id)
                     )
 
+        # 6. Documents
+        print("📂 Migriere Dokumente...")
+        self.old_cur.execute("SELECT * FROM Documents")
+        old_docs = self.old_cur.fetchall()
+
+        for doc in old_docs:
+            self.new_cur.execute(
+                "INSERT INTO Documents (Id, FileName, EncryptedName, DocumentType, MusicRecordId) VALUES (%s, %s, %s, %s, %s)",
+                (doc['Id'], doc['FileName'], doc['EncryptedName'], doc['DocumentType'], doc['MusicRecordId'])
+            )
+
         self.new_conn.commit()
-        print(f"✅ Fertig! {len(old_data)} Records migriert.")
+        print(f"✅ Fertig! {len(old_data)} Records und {len(old_docs)} Dokumente migriert.")
 
     def close(self):
         self.old_cur.close(); self.new_cur.close()
