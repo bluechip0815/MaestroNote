@@ -37,7 +37,7 @@ class MigrationSpecialist:
             sys.exit(1)
 
         # Caching um Duplikate in den Stammdaten zu vermeiden
-        self.cache = {'dirigent': {}, 'orchester': {}, 'komponist': {}, 'werk': {}, 'solist': {}}
+        self.cache = {'dirigent': {}, 'orchester': {}, 'komponist': {}, 'werk': {}, 'solist': {}, 'ort': {}}
 
     def split_name(self, full_name):
         if not full_name: return "", ""
@@ -50,7 +50,7 @@ class MigrationSpecialist:
         # EF Core Standard-Tabellennamen für n:m Beziehungen
         tables = [
             "MusicRecordSolist", "MusicRecordWerk", "MusicRecords", 
-            "Solisten", "Werke", "Komponisten", "Orchester", "Dirigenten"
+            "Solisten", "Werke", "Komponisten", "Orchester", "Dirigenten", "Orte"
         ]
         self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
         for table in tables:
@@ -80,6 +80,9 @@ class MigrationSpecialist:
             o_id = self.get_or_create('orchester', row['Orchester'], 
                 "INSERT INTO Orchester (Name) VALUES (%s)", (row['Orchester'],)) if row['Orchester'] else None
 
+            ort_id = self.get_or_create('ort', row['Ort'],
+                "INSERT INTO Orte (Name) VALUES (%s)", (row['Ort'],)) if row['Ort'] else None
+
             # 2. Komponist & Werk
             w_id = None
             if row['Werk']:
@@ -94,13 +97,13 @@ class MigrationSpecialist:
             # 3. MusicRecord Hauptdatensatz (OHNE die alten Spalten 'Werk'/'Komponist')
             bewertung = f"{row['Bewertung1']}\n{row['Bewertung2']}".strip()
             sql_mr = """INSERT INTO MusicRecords 
-                        (Id, Bezeichnung, Datum, Spielsaison, Bewertung, Ort, DirigentId, OrchesterId) 
+                        (Id, Bezeichnung, Datum, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
             
             # Als 'Bezeichnung' nehmen wir den Namen des Werks
             self.new_cur.execute(sql_mr, (
                 row['Id'], row['Werk'], row['Datum'], row['Spielsaison'], 
-                bewertung, row['Ort'], d_id, o_id
+                bewertung, ort_id, d_id, o_id
             ))
 
             # 4. n:m Beziehung: MusicRecord <-> Werk
