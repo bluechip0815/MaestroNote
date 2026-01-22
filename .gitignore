@@ -57,3 +57,7 @@ wwwroot/Documents/
 appsettings.Development.json
 MaestroNotes.csproj.user
 readme.txt
+
+# Python
+__pycache__/
+.env

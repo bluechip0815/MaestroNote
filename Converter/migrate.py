@@ -6,6 +6,10 @@ import os
 import unicodedata
 import re
 import json
+from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ============================================================
 # KONFIGURATION DER VERBINDUNGSDATEN (aus Umgebungsvariablen)
@@ -54,6 +58,57 @@ class MigrationSpecialist:
         self.name_index = {'dirigent': {}, 'komponist': {}, 'solist': {}}
         self.correction_map = {}
         self.todo_counter = 1
+
+        # AI Setup
+        self.api_key = os.getenv("AI_API_KEY")
+        self.client = OpenAI(api_key=self.api_key) if self.api_key else None
+        if not self.client:
+             print("⚠️ Warning: No AI_API_KEY found. AI features will be skipped.")
+
+    def analyze_with_ai(self, komponist, werk, bewertung):
+        if not self.client: return None
+
+        prompt = f"""
+        Analyze the following classical music record and extract a structured list of composers and their works.
+
+        Input Data:
+        - Komponist (Composer field): "{komponist}"
+        - Werk (Work field): "{werk}"
+        - Bemerkung (Notes): "{bewertung}"
+
+        Instructions:
+        1. The 'Komponist' field may contain multiple names (separated by /, comma, 'und') or 'u.a.' (meaning 'and others').
+        2. If 'u.a.' is present, or multiple names are listed, check 'Bemerkung' for details on other works performed.
+        3. Return a JSON object with a single key "items" containing a list of objects.
+        4. Each object must have:
+           - "Komponist": The full name of the composer.
+           - "Werk": The title of the work.
+        5. If the 'Werk' field applies to the first composer, include it.
+
+        Example JSON Output:
+        {{
+          "items": [
+            {{ "Komponist": "Ludwig van Beethoven", "Werk": "Symphonie Nr. 5" }},
+            {{ "Komponist": "Wolfgang Amadeus Mozart", "Werk": "Ouvertüre zu Die Zauberflöte" }}
+          ]
+        }}
+        """
+
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that extracts structured data from legacy database records. Output valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            content = response.choices[0].message.content
+            data = json.loads(content)
+            return data.get("items", [])
+        except Exception as e:
+            print(f"❌ AI Error: {e}")
+            return None
 
     def normalize_name(self, name):
         """
@@ -328,51 +383,70 @@ class MigrationSpecialist:
             if row['Werk']:
                 komp_strings = self.split_komponist_string(row['Komponist'])
                 
-                # Check if we have multiple composers or just one (or none if Komponist field was empty but Werk wasn't?)
-                # If Komponist empty, komp_strings is empty.
-                if not komp_strings:
-                     # Fallback: Work with no composer? Or skipped?
-                     # Original logic: if row['Komponist'] else None
-                     # If row['Komponist'] was empty, k_id was None.
-                     # But Werk table expects KomponistId?
-                     # Original SQL: INSERT INTO Werke ... VALUES (..., k_id) -> k_id can be None?
-                     # Check schema... usually nullable or fails.
-                     # Let's assume standard behavior: 1 Werk, No Composer.
-                     pass
+                # Check for AI triggers
+                k_raw = row['Komponist'] or ""
+                has_ua = "u.a." in k_raw.lower() or "u. a." in k_raw.lower()
 
-                if len(komp_strings) <= 1:
-                    # Standard Case
-                    k_str = komp_strings[0] if komp_strings else None
-                    k_id = None
-                    if k_str:
-                        k_id = self.get_or_create('komponist', k_str,
-                            "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
-                            (*self.split_name(k_str), ""))
+                ai_done = False
+                ai_komponisten_names = []
 
-                    werk_key = f"{row['Werk']}_{k_id}"
-                    w_id = self.get_or_create('werk', werk_key,
-                        "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (row['Werk'], k_id))
-                    w_ids.append(w_id)
-                else:
-                    # Multi-Composer Case -> Create "Todo X" Works for each
-                    for k_str in komp_strings:
-                        k_id = self.get_or_create('komponist', k_str,
-                            "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
-                            (*self.split_name(k_str), ""))
+                if (len(komp_strings) > 1 or has_ua) and self.client:
+                    # Trigger AI
+                    bewertung_ai = row['Bewertung1'] or ""
+                    print(f"🤖 AI Request for ID {row['Id']}: {k_raw} | {row['Werk']}")
+                    ai_items = self.analyze_with_ai(k_raw, row['Werk'], bewertung_ai)
 
-                        # Create unique Todo work
-                        todo_name = f"Todo {self.todo_counter}"
-                        self.todo_counter += 1
+                    if ai_items:
+                        ai_done = True
+                        for item in ai_items:
+                            ai_k = item.get("Komponist")
+                            ai_w = item.get("Werk")
 
-                        # We don't really deduplicate Todo works (they are unique by counter), but we use get_or_create for consistency or direct insert?
-                        # Using direct insert is safer to ensure uniqueness and not polluting cache with "Todo 1" etc if not needed?
-                        # But get_or_create handles the cache logic.
-                        # Cache key: "Todo 1_123".
+                            if ai_k and ai_w:
+                                ai_komponisten_names.append(ai_k)
+                                # Create/Find Komponist
+                                k_id = self.get_or_create('komponist', ai_k,
+                                    "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
+                                    (*self.split_name(ai_k), ""))
 
-                        werk_key = f"{todo_name}_{k_id}"
+                                # Create/Find Werk
+                                werk_key = f"{ai_w}_{k_id}"
+                                w_id = self.get_or_create('werk', werk_key,
+                                    "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (ai_w, k_id))
+                                w_ids.append(w_id)
+                        print(f"   -> AI found {len(ai_items)} items.")
+                    else:
+                        print("   -> AI returned no results. Falling back.")
+
+                if not ai_done:
+                    if len(komp_strings) <= 1:
+                        # Standard Case
+                        k_str = komp_strings[0] if komp_strings else None
+                        k_id = None
+                        if k_str:
+                            k_id = self.get_or_create('komponist', k_str,
+                                "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
+                                (*self.split_name(k_str), ""))
+
+                        werk_key = f"{row['Werk']}_{k_id}"
                         w_id = self.get_or_create('werk', werk_key,
-                             "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (todo_name, k_id))
+                            "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (row['Werk'], k_id))
                         w_ids.append(w_id)
+                    else:
+                        # Multi-Composer Case -> Create "Todo X" Works for each
+                        for k_str in komp_strings:
+                            k_id = self.get_or_create('komponist', k_str,
+                                "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
+                                (*self.split_name(k_str), ""))
+
+                            # Create unique Todo work
+                            todo_name = f"Todo {self.todo_counter}"
+                            self.todo_counter += 1
+
+                            werk_key = f"{todo_name}_{k_id}"
+                            w_id = self.get_or_create('werk', werk_key,
+                                 "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (todo_name, k_id))
+                            w_ids.append(w_id)
 
 
             # 3. MusicRecord Hauptdatensatz (OHNE die alten Spalten 'Werk'/'Komponist')
@@ -381,9 +455,13 @@ class MigrationSpecialist:
                         (Id, Bezeichnung, Datum, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
             
-            # Als 'Bezeichnung' nehmen wir den Namen des Werks (Original String)
+            # Determine 'Bezeichnung'
+            bezeichnung = row['Werk']
+            if ai_done and ai_komponisten_names:
+                bezeichnung = f"Konzert ({', '.join(ai_komponisten_names)})"
+
             self.new_cur.execute(sql_mr, (
-                row['Id'], row['Werk'], row['Datum'], row['Spielsaison'], 
+                row['Id'], bezeichnung, row['Datum'], row['Spielsaison'],
                 bewertung, ort_id, d_id, o_id
             ))
 
