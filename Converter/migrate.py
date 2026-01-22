@@ -388,6 +388,7 @@ class MigrationSpecialist:
                 has_ua = "u.a." in k_raw.lower() or "u. a." in k_raw.lower()
 
                 ai_done = False
+                ai_komponisten_names = []
 
                 if (len(komp_strings) > 1 or has_ua) and self.client:
                     # Trigger AI
@@ -402,6 +403,7 @@ class MigrationSpecialist:
                             ai_w = item.get("Werk")
 
                             if ai_k and ai_w:
+                                ai_komponisten_names.append(ai_k)
                                 # Create/Find Komponist
                                 k_id = self.get_or_create('komponist', ai_k,
                                     "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
@@ -453,9 +455,13 @@ class MigrationSpecialist:
                         (Id, Bezeichnung, Datum, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
             
-            # Als 'Bezeichnung' nehmen wir den Namen des Werks (Original String)
+            # Determine 'Bezeichnung'
+            bezeichnung = row['Werk']
+            if ai_done and ai_komponisten_names:
+                bezeichnung = f"Konzert ({', '.join(ai_komponisten_names)})"
+
             self.new_cur.execute(sql_mr, (
-                row['Id'], row['Werk'], row['Datum'], row['Spielsaison'], 
+                row['Id'], bezeichnung, row['Datum'], row['Spielsaison'],
                 bewertung, ort_id, d_id, o_id
             ))
 
