@@ -111,7 +111,8 @@ a:hover, .btn-link:hover {
 /* Fix for dropdowns being clipped in table-responsive on desktop */
 @media (min-width: 769px) {
     .table-responsive {
-        overflow: visible;
+        overflow: visible !important;
+        min-height: 400px;
     }
 }
 
