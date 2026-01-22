@@ -108,6 +108,14 @@ a:hover, .btn-link:hover {
     opacity: 0.5;
 }
 
+/* Fix for dropdowns being clipped in table-responsive on desktop */
+@media (min-width: 769px) {
+    .table-responsive {
+        overflow: visible !important;
+        min-height: 400px;
+    }
+}
+
 /* Mobile Styles */
 @media (max-width: 768px) {
     /* Search Section */
