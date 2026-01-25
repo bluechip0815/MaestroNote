@@ -537,7 +537,7 @@
             if (result is AiKomponistResponseDto dto)
             {
                 newKomponist.Born = dto.Born;
-                newKomponist.Note = dto.Note;
+                newKomponist.Note = dto.Note ?? "";
             }
         }
         catch (Exception ex)

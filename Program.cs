@@ -58,51 +58,56 @@ app.MapFallbackToPage("/_Host");
 Log.Information("Starting web host");
 
 // Perform data migration
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<MusicContext>();
-        DataMigrationService.MigrateData(context);
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "An error occurred during data migration.");
-    }
-}
+//using (var scope = app.Services.CreateScope())
+//{
+//    var services = scope.ServiceProvider;
+//    try
+//    {
+//        var context = services.GetRequiredService<MusicContext>();
+//        DataMigrationService.MigrateData(context);
+//    }
+//    catch (Exception ex)
+//    {
+//        Log.Error(ex, "An error occurred during data migration.");
+//    }
+//}
 
 app.Run();
+
 static void SetLogging(WebApplicationBuilder builder)
 {
-    string? logFilePath = builder.Configuration["Serilog:WriteTo:1:Args:path"];
-    if (logFilePath == null)
+    // Optional: Serilog internal diagnostics to help when sinks fail
+    // SelfLog.Enable(msg => Console.Error.WriteLine(msg));
+
+    // 1) Read desired path from config
+    var configuredPath = builder.Configuration["Serilog:WriteTo:1:Args:path"] ?? "logs\\log.txt";
+
+    // 2) Make it absolute based on content root (more predictable under IIS)
+    var fullPath = Path.IsPathRooted(configuredPath)
+        ? configuredPath
+        : Path.Combine(builder.Environment.ContentRootPath, configuredPath);
+
+    // 3) Ensure directory exists; if not possible, fall back to console-only file path or skip file sink
+    try
     {
-        logFilePath = ".\\log.txt";
+        var dir = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrWhiteSpace(dir))
+            Directory.CreateDirectory(dir);
     }
-    else
+    catch
     {
-        try
-        {
-            int idx = logFilePath.LastIndexOf("\\");
-            string logDirectory = (idx == -1) ? logFilePath : logFilePath.Substring(0, idx);
-            if (!Directory.Exists(logDirectory))
-            {
-                Directory.CreateDirectory(logDirectory);
-            }
-        }
-        catch (Exception)
-        {
-            logFilePath = Directory.GetCurrentDirectory() + "\\log.txt";
-        }
+        // If directory creation fails, fall back to a safe location or skip file sink
+        fullPath = Path.Combine(builder.Environment.ContentRootPath, "log.txt");
     }
 
-    Log.Logger = new LoggerConfiguration()
-       .MinimumLevel.Debug()
-       .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Information)  // Redirect Microsoft logs
-       .Enrich.FromLogContext()
-       .WriteTo.Console()  // Log to console
-       .WriteTo.File(logFilePath, rollingInterval: RollingInterval.Day)  // Log to absolute path
-       .CreateLogger();
+    // 4) Build logger primarily from configuration
+    builder.Host.UseSerilog((ctx, services, lc) =>
+    {
+        lc.ReadFrom.Configuration(ctx.Configuration)
+          .Enrich.FromLogContext();
 
+        // Optionally override the file path from config with the resolved absolute path:
+        // (Easiest way is to keep config relative and just pass fullPath in code)
+        lc.WriteTo.File(fullPath, rollingInterval: RollingInterval.Day);
+    });
 }

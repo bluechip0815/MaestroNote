@@ -892,7 +892,7 @@ else
                     name = $"{k.Vorname} {k.Name}".Trim();
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var kRes = await AiService.RequestAiData(name, "Komponist") as AiKomponistResponseDto;
-                    if (kRes != null) { k.Born = kRes.Born; k.Note = kRes.Note; }
+                    if (kRes != null) { k.Born = kRes.Born; k.Note = kRes.Note ?? ""; }
                     break;
                 case "Orchester":
                     var o = (Orchester)EditMasterItem;
