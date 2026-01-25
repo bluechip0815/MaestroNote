@@ -323,11 +323,11 @@ namespace MaestroNotes.Data
             var idProp = typeof(T).GetProperty("Id");
             if (idProp != null && idProp.PropertyType == typeof(int))
             {
-                int id = (int)idProp.GetValue(entity);
-                if (id != 0)
+                int? id = idProp.GetValue(entity) as int?;
+                if (id!=null && id != 0)
                 {
                     var existing = _context.ChangeTracker.Entries<T>()
-                        .FirstOrDefault(e => (int)idProp.GetValue(e.Entity) == id);
+                        .FirstOrDefault(e => idProp.GetValue(e.Entity) is int entityId && entityId == id);
 
                     if (existing != null)
                     {
@@ -405,7 +405,7 @@ namespace MaestroNotes.Data
                 .SelectMany(m => m.Werke)
                 .Select(w => w.Komponist)
                 .Where(k => k != null)
-                .Select(k => k.Name + (string.IsNullOrEmpty(k.Vorname) ? "" : ", " + k.Vorname))
+                .Select(k => k!.Name + (string.IsNullOrEmpty(k.Vorname) ? "" : ", " + k.Vorname))
                 .Distinct()
                 .OrderBy(n => n)
                 .ToList();
@@ -417,7 +417,7 @@ namespace MaestroNotes.Data
                 .SelectMany(m => m.Werke)
                 .Select(w => w.Name)
                 .Distinct()
-                .OrderBy(n => n)
+                //.OrderBy(n => n)
                 .ToList();
         }
 
@@ -425,7 +425,7 @@ namespace MaestroNotes.Data
         {
             return _context.MusicRecords
                 .Where(m => m.Orchester != null)
-                .Select(m => m.Orchester.Name)
+                .Select(m => m.Orchester!.Name)
                 .Distinct()
                 .OrderBy(n => n)
                 .ToList();
@@ -435,7 +435,7 @@ namespace MaestroNotes.Data
         {
             return _context.MusicRecords
                 .Where(m => m.Dirigent != null)
-                .Select(m => m.Dirigent.Name + (string.IsNullOrEmpty(m.Dirigent.Vorname) ? "" : ", " + m.Dirigent.Vorname))
+                .Select(m => m.Dirigent!.Name + (string.IsNullOrEmpty(m.Dirigent.Vorname) ? "" : ", " + m.Dirigent.Vorname))
                 .Distinct()
                 .OrderBy(n => n)
                 .ToList();
