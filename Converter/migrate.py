@@ -44,20 +44,26 @@ DB_CONFIG = {
 }
 
 class MigrationSpecialist:
-    def __init__(self, interactive=False):
+    def __init__(self, interactive=False, connect=True):
         self.interactive = interactive
-        try:
-            self.old_conn = mysql.connector.connect(**DB_CONFIG["old"])
-            self.old_cur = self.old_conn.cursor(dictionary=True)
-            logging.info("✓ Alte Datenbank verbunden.")
+        if connect:
+            try:
+                self.old_conn = mysql.connector.connect(**DB_CONFIG["old"])
+                self.old_cur = self.old_conn.cursor(dictionary=True)
+                logging.info("✓ Alte Datenbank verbunden.")
 
-            self.new_conn = mysql.connector.connect(**DB_CONFIG["new"])
-            self.new_cur = self.new_conn.cursor()
-            logging.info("✓ Neue Datenbank verbunden.")
+                self.new_conn = mysql.connector.connect(**DB_CONFIG["new"])
+                self.new_cur = self.new_conn.cursor()
+                logging.info("✓ Neue Datenbank verbunden.")
 
-        except Error as e:
-            logging.error(f"❌ Verbindungsfehler: {e}")
-            sys.exit(1)
+            except Error as e:
+                logging.error(f"❌ Verbindungsfehler: {e}")
+                sys.exit(1)
+        else:
+            self.old_conn = None
+            self.old_cur = None
+            self.new_conn = None
+            self.new_cur = None
 
         # Caching um Duplikate in den Stammdaten zu vermeiden
         # Key: Normalized String, Value: ID in DB
@@ -88,6 +94,59 @@ class MigrationSpecialist:
         pattern = r"\s*[/,]\s*|\s+und\s+"
         parts = re.split(pattern, val, flags=re.IGNORECASE)
         return [p.strip() for p in parts if p.strip()]
+
+    def validate_and_fix_input(self, category, value):
+        """
+        Validates input based on rules:
+        - Skip 'etc.', 'u.a.'
+        - Min length 4 chars
+        - Person types must have First and Last Name
+        Returns cleaned value or None (if skipped).
+        Handles interactive prompting.
+        """
+        current_val = value
+
+        while True:
+            if not current_val: return None
+
+            # 1. Blacklist Check
+            lower_val = current_val.lower().strip()
+            if lower_val in ['etc.', 'u.a.', 'u. a.'] or lower_val.endswith('etc.'):
+                logging.info(f"Skipping junk entry: '{current_val}'")
+                return None
+
+            # 2. Length Check
+            if len(current_val) < 4:
+                msg = f"Value '{current_val}' is too short (<4 chars)."
+                if self.interactive:
+                    print(f"\n⚠️ {msg}")
+                    choice = input("(s)kip, (e)dit, (a)ccept? ").strip().lower()
+                    if choice == 's': return None
+                    if choice == 'e':
+                        current_val = input("Enter new value: ").strip()
+                        continue
+                    # 'a' accepts (proceeds to next check or returns)
+                else:
+                    logging.info(f"Skipping '{current_val}' (too short)")
+                    return None
+
+            # 3. Person Check (Missing Name Parts)
+            if category in ['dirigent', 'komponist', 'solist']:
+                first, last = self.split_name(current_val)
+                if not first or not last:
+                    msg = f"Value '{current_val}' is missing First or Last Name."
+                    if self.interactive:
+                        print(f"\n⚠️ {msg}")
+                        choice = input("(s)kip, (e)dit? ").strip().lower()
+                        if choice == 's': return None
+                        if choice == 'e':
+                            current_val = input("Enter full correct name: ").strip()
+                            continue
+                    else:
+                        logging.info(f"Skipping '{current_val}' (incomplete name)")
+                        return None
+
+            return current_val
 
     def load_correction_map(self, filepath):
         if not filepath or not os.path.exists(filepath):
@@ -196,7 +255,21 @@ class MigrationSpecialist:
         if norm_key in self.cache[category]:
             return self.cache[category][norm_key]
 
-        # 3. Name-Only Lookup (for Person categories)
+        # 3. Validation (NEW)
+        # Only validate if we are creating new (not in cache)
+        # Note: We validate val_to_use. If user edits in interactive validation, val_to_use changes.
+        validated_val = self.validate_and_fix_input(category, val_to_use)
+        if not validated_val:
+            return None # Skip
+
+        if validated_val != val_to_use:
+            val_to_use = validated_val
+            norm_key = self.normalize_name(val_to_use)
+            # Re-check cache just in case user entered something existing
+            if norm_key in self.cache[category]:
+                return self.cache[category][norm_key]
+
+        # 4. Name-Only Lookup (for Person categories)
         if category in ['dirigent', 'komponist', 'solist']:
             first, last = self.split_name(val_to_use)
             if not first and last: # Name only provided (e.g. "Beethoven")
@@ -325,7 +398,7 @@ class MigrationSpecialist:
         for row in self.old_cur.fetchall():
             val = row['Solist']
             # Clean: remove 'u.a.'
-            val_clean = val.replace("u.a.", "").replace("u. a.", "").strip()
+            val_clean = val.replace("u.a.", "").replace("u. a.", "").replace("etc.", "").strip()
             if not val_clean: continue
             
             # Split by comma
