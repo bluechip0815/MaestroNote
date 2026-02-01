@@ -6,10 +6,22 @@ import os
 import unicodedata
 import re
 import json
-from openai import OpenAI
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ============================================================
+# LOGGING CONFIGURATION
+# ============================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("migration.log", mode='w', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 
 # ============================================================
 # KONFIGURATION DER VERBINDUNGSDATEN (aus Umgebungsvariablen)
@@ -32,106 +44,37 @@ DB_CONFIG = {
 }
 
 class MigrationSpecialist:
-    def __init__(self, only_old_db=False):
+    def __init__(self, interactive=False):
+        self.interactive = interactive
         try:
             self.old_conn = mysql.connector.connect(**DB_CONFIG["old"])
             self.old_cur = self.old_conn.cursor(dictionary=True)
-            print("✓ Alte Datenbank verbunden.")
+            logging.info("✓ Alte Datenbank verbunden.")
 
-            if not only_old_db:
-                self.new_conn = mysql.connector.connect(**DB_CONFIG["new"])
-                self.new_cur = self.new_conn.cursor()
-                print("✓ Neue Datenbank verbunden.")
-            else:
-                self.new_conn = None
-                self.new_cur = None
+            self.new_conn = mysql.connector.connect(**DB_CONFIG["new"])
+            self.new_cur = self.new_conn.cursor()
+            logging.info("✓ Neue Datenbank verbunden.")
 
         except Error as e:
-            print(f"❌ Verbindungsfehler: {e}")
+            logging.error(f"❌ Verbindungsfehler: {e}")
             sys.exit(1)
 
         # Caching um Duplikate in den Stammdaten zu vermeiden
         # Key: Normalized String, Value: ID in DB
         self.cache = {'dirigent': {}, 'orchester': {}, 'komponist': {}, 'werk': {}, 'solist': {}, 'ort': {}}
         # Lookup for "Name only" ambiguity resolution
-        # Structure: { category: { normalized_lastname: [set of normalized_fullnames] } }
         self.name_index = {'dirigent': {}, 'komponist': {}, 'solist': {}}
         self.correction_map = {}
         self.todo_counter = 1
 
-        # AI Setup
-        self.api_key = os.getenv("AI_API_KEY")
-        self.client = OpenAI(api_key=self.api_key) if self.api_key else None
-        if not self.client:
-             print("⚠️ Warning: No AI_API_KEY found. AI features will be skipped.")
-
-    def analyze_with_ai(self, komponist, werk, bewertung):
-        if not self.client: return None
-
-        prompt = f"""
-        Analyze the following classical music record and extract a structured list of composers and their works.
-
-        Input Data:
-        - Komponist (Composer field): "{komponist}"
-        - Werk (Work field): "{werk}"
-        - Bemerkung (Notes): "{bewertung}"
-
-        Instructions:
-        1. The 'Komponist' field may contain multiple names (separated by /, comma, 'und') or 'u.a.' (meaning 'and others').
-        2. If 'u.a.' is present, or multiple names are listed, check 'Bemerkung' for details on other works performed.
-        3. Return a JSON object with a single key "items" containing a list of objects.
-        4. Each object must have:
-           - "Komponist": The full name of the composer.
-           - "Werk": The title of the work.
-        5. If the 'Werk' field applies to the first composer, include it.
-
-        Example JSON Output:
-        {{
-          "items": [
-            {{ "Komponist": "Ludwig van Beethoven", "Werk": "Symphonie Nr. 5" }},
-            {{ "Komponist": "Wolfgang Amadeus Mozart", "Werk": "Ouvertüre zu Die Zauberflöte" }}
-          ]
-        }}
-        """
-
-        try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant that extracts structured data from legacy database records. Output valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"}
-            )
-            content = response.choices[0].message.content
-            data = json.loads(content)
-            return data.get("items", [])
-        except Exception as e:
-            print(f"❌ AI Error: {e}")
-            return None
+        # Load existing data from New DB
+        self.load_existing_data()
 
     def normalize_name(self, name):
-        """
-        Normalisiert Namen für den Vergleich:
-        - Kleinbuchstaben
-        - Entfernt Akzente
-        - Standardisiert 'v.' -> 'van'
-        - Trimmt Whitespace
-        """
-        if not name:
-            return ""
-
-        # 1. Lowercase
+        if not name: return ""
         s = name.lower()
-
-        # 2. Remove accents
         s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
-
-        # 3. Replace 'v.' or 'v ' with 'van '
-        # Matches 'v.' or 'v' followed by space at word boundary
         s = re.sub(r'\bv\.?\s+', 'van ', s)
-
-        # 4. Trim
         return s.strip()
 
     def split_name(self, full_name):
@@ -141,140 +84,24 @@ class MigrationSpecialist:
         return " ".join(parts[:-1]), parts[-1]
 
     def split_komponist_string(self, val):
-        """
-        Splits Komponist string by '/', ',', and ' und '.
-        Returns a list of clean names.
-        """
-        if not val:
-            return []
-
+        if not val: return []
         pattern = r"\s*[/,]\s*|\s+und\s+"
         parts = re.split(pattern, val, flags=re.IGNORECASE)
-
         return [p.strip() for p in parts if p.strip()]
 
     def load_correction_map(self, filepath):
-        if not filepath: return
-        if not os.path.exists(filepath):
-            print(f"⚠️ Korrektur-Map nicht gefunden: {filepath}")
+        if not filepath or not os.path.exists(filepath):
+            logging.warning(f"⚠️ Korrektur-Map nicht gefunden: {filepath}")
             return
-
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 self.correction_map = json.load(f)
-            print(f"✓ Korrektur-Map geladen ({len(self.correction_map)} Einträge).")
+            logging.info(f"✓ Korrektur-Map geladen ({len(self.correction_map)} Einträge).")
         except Exception as e:
-            print(f"❌ Fehler beim Laden der Korrektur-Map: {e}")
-
-    def generate_correction_map(self, output_path):
-        print("🔍 Analysiere Daten auf Duplikate und Ambiguities...")
-
-        # 1. Pass: Collect all normalized names to detect ambiguities
-        # We need to scan all data to build the name index FIRST
-        # because "Müller" might appear before "Thomas Müller".
-
-        temp_name_index = {'dirigent': {}, 'komponist': {}, 'solist': {}}
-        all_values = {'dirigent': [], 'komponist': [], 'solist': [], 'orchester': [], 'ort': []} # To avoid re-reading DB cursor if possible, or just store sets?
-
-        # We'll read all into memory (dataset size seems manageable given context)
-        self.old_cur.execute("SELECT * FROM MusicRecords")
-        old_data = self.old_cur.fetchall()
-
-        # Helper to collect full names
-        def collect_full_names(category, val):
-            if not val: return
-            norm = self.normalize_name(val)
-            if not norm: return
-
-            # Store raw val for later duplicate check
-            all_values[category].append(val)
-
-            # If category supports name/vorname split
-            if category in ['dirigent', 'komponist', 'solist']:
-                first, last = self.split_name(val)
-                if first: # Has a first name
-                    norm_last = self.normalize_name(last)
-                    if norm_last not in temp_name_index[category]:
-                        temp_name_index[category][norm_last] = set()
-                    temp_name_index[category][norm_last].add(norm) # Store full normalized name
-
-        # Pass 1: Build Index
-        for row in old_data:
-            collect_full_names('dirigent', row['Dirigent'])
-            # Komponist split
-            for k in self.split_komponist_string(row['Komponist']):
-                collect_full_names('komponist', k)
-            # Solist split
-            if row['Solist']:
-                solist_clean = row['Solist'].replace("u.a.", "").replace("u. a.", "").strip()
-                for s in [x.strip() for x in solist_clean.split(',')]:
-                    collect_full_names('solist', s)
-
-            # Others (just for duplicate check later)
-            if row['Orchester']: all_values['orchester'].append(row['Orchester'])
-            if row['Ort']: all_values['ort'].append(row['Ort'])
-
-        duplicates_map = {}
-        seen_normalized = {c: {} for c in all_values.keys()}
-
-        # Pass 2: Detect Duplicates and Ambiguities
-        def check_value(category, val):
-            if not val: return
-            norm = self.normalize_name(val)
-            if not norm: return
-
-            # A. Check "Name Only" Ambiguity
-            if category in ['dirigent', 'komponist', 'solist']:
-                first, last = self.split_name(val)
-                if not first and last: # Name only
-                    norm_last = self.normalize_name(last)
-                    possible_matches = temp_name_index[category].get(norm_last, set())
-
-                    if len(possible_matches) > 1:
-                        # AMBIGUOUS
-                         duplicates_map[val] = f"AMBIGUOUS: {' | '.join(sorted(list(possible_matches)))}"
-                         return # Skip standard duplicate check? Or continue?
-                         # If ambiguous, we don't know which one it is, so we can't really "deduplicate" automatically.
-                    elif len(possible_matches) == 1:
-                         # UNIQUE MATCH
-                         # We can suggest mapping "Müller" -> "Thomas Müller"
-                         match = list(possible_matches)[0]
-                         # We need the original string of the match? 'match' is normalized.
-                         # This is tricky. We stored normalized strings in index.
-                         # The map expects { "Bad": "Good" }.
-                         # If we map "Müller" -> "thomas muller", the next run will normalize "thomas muller" and find ID.
-                         # This is acceptable? Yes.
-                         if val not in duplicates_map:
-                             duplicates_map[val] = match
-                         return
-
-            # B. Standard Deduplication
-            if norm in seen_normalized[category]:
-                first_val = seen_normalized[category][norm]
-                if first_val != val:
-                     if val not in duplicates_map:
-                         duplicates_map[val] = first_val
-            else:
-                seen_normalized[category][norm] = val
-
-        # Iterate again over the collected values (preserving order effectively)
-        for cat, vals in all_values.items():
-            for v in vals:
-                check_value(cat, v)
-
-        print(f"✓ Analyse beendet. {len(duplicates_map)} Einträge für Map gefunden.")
-
-        try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                # Convert sets to lists if any slipped in (shouldn't happen with current logic)
-                json.dump(duplicates_map, f, indent=4, ensure_ascii=False)
-            print(f"💾 Map gespeichert unter: {output_path}")
-        except Exception as e:
-            print(f"❌ Fehler beim Speichern der Map: {e}")
+            logging.error(f"❌ Fehler beim Laden der Korrektur-Map: {e}")
 
     def clear_new_db(self):
-        print("⚠️ Lösche neue Datenbank für frischen Import...")
-        # EF Core Standard-Tabellennamen für n:m Beziehungen
+        logging.info("⚠️ Lösche neue Datenbank für frischen Import...")
         tables = [
             "MusicRecordSolist", "MusicRecordWerk", "MusicRecords", 
             "Solisten", "Werke", "Komponisten", "Orchester", "Dirigenten", "Orte", "Documents"
@@ -286,10 +113,60 @@ class MigrationSpecialist:
         self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
         self.new_conn.commit()
 
+    def load_existing_data(self):
+        """Loads existing entities from the new database into the cache."""
+        logging.info("Loading existing data from new database...")
+
+        # Helper to load simple entities
+        def load_simple(table, cache_key):
+            try:
+                self.new_cur.execute(f"SELECT Id, Name FROM {table}")
+                for row in self.new_cur.fetchall():
+                    norm = self.normalize_name(row[1])
+                    if norm:
+                        self.cache[cache_key][norm] = row[0]
+            except Exception as e:
+                logging.error(f"Error loading {table}: {e}")
+
+        # Helper to load person entities (with Vorname)
+        def load_person(table, cache_key):
+            try:
+                self.new_cur.execute(f"SELECT Id, Vorname, Name FROM {table}")
+                for row in self.new_cur.fetchall():
+                    full_name = f"{row[1]} {row[2]}".strip()
+                    norm = self.normalize_name(full_name)
+                    if norm:
+                        self.cache[cache_key][norm] = row[0]
+                        self.update_name_index(cache_key, full_name, row[0])
+            except Exception as e:
+                logging.error(f"Error loading {table}: {e}")
+
+        load_person("Dirigenten", "dirigent")
+        load_person("Komponisten", "komponist")
+        load_person("Solisten", "solist")
+        load_simple("Orchester", "orchester")
+        load_simple("Orte", "ort")
+
+        # Werke need special handling (Name + KomponistId)
+        try:
+            self.new_cur.execute("SELECT Id, Name, KomponistId FROM Werke")
+            for row in self.new_cur.fetchall():
+                key = f"{row[1]}_{row[2]}"
+                norm = self.normalize_name(key) # Normalizing the key?
+                # Original script used: werk_key = f"{ai_w}_{k_id}" -> normalize_name(werk_key)
+                # Let's keep consistent: key is passed to get_or_create, which normalizes it.
+                # So we should normalize the lookup key.
+                # But here the key structure is complex.
+                # In original script: get_or_create('werk', f"{name}_{k_id}")
+                # normalize_name just lowercases and removes accents.
+                # So we should normalize the name part? No, the whole string.
+                # Just store it normalized.
+                if norm:
+                    self.cache['werk'][norm] = row[0]
+        except Exception as e:
+            logging.error(f"Error loading Werke: {e}")
+
     def update_name_index(self, category, full_name, db_id):
-        """
-        Updates the runtime name index when a new valid record with First+Last name is added.
-        """
         if category not in self.name_index: return
         first, last = self.split_name(full_name)
         if first and last:
@@ -299,208 +176,422 @@ class MigrationSpecialist:
 
             # Store tuple of (normalized_full_name, db_id)
             norm_full = self.normalize_name(full_name)
-            self.name_index[category][norm_last].append((norm_full, db_id))
+            # Avoid adding duplicates
+            if not any(entry[1] == db_id for entry in self.name_index[category][norm_last]):
+                self.name_index[category][norm_last].append((norm_full, db_id))
 
-    def get_or_create(self, cache_key, lookup_val, insert_sql, params):
-        if not lookup_val: return None
+    def ensure_entity(self, category, value, insert_sql, params):
+        """
+        Tries to find the entity. If not found, creates it.
+        Handles ambiguities via interactive mode or skipping.
+        Returns ID or None if skipped.
+        """
+        if not value: return None
 
-        # 1. Apply Correction Map
-        val_to_use = self.correction_map.get(lookup_val, lookup_val)
-
-        # 2. Normalize
+        # 1. Apply Correction
+        val_to_use = self.correction_map.get(value, value)
         norm_key = self.normalize_name(val_to_use)
 
-        # 3. Check Cache (using normalized key)
-        if norm_key in self.cache[cache_key]:
-            return self.cache[cache_key][norm_key]
+        # 2. Cache Lookup
+        if norm_key in self.cache[category]:
+            return self.cache[category][norm_key]
 
-        # 3b. Name-Only Lookup Logic (if not in cache)
-        if cache_key in ['dirigent', 'komponist', 'solist']:
-             first, last = self.split_name(val_to_use)
-             if not first and last: # No first name
-                 norm_last = self.normalize_name(last)
-                 candidates = self.name_index[cache_key].get(norm_last, [])
+        # 3. Name-Only Lookup (for Person categories)
+        if category in ['dirigent', 'komponist', 'solist']:
+            first, last = self.split_name(val_to_use)
+            if not first and last: # Name only provided (e.g. "Beethoven")
+                norm_last = self.normalize_name(last)
+                candidates = self.name_index[category].get(norm_last, [])
+                unique_ids = list({c[1] for c in candidates})
 
-                 # Logic: If exactly one match, use it.
-                 # Note: candidates contains (norm_full, id)
-                 # We need to filter duplicates in candidates list (same person might be added twice if logic fails elsewhere,
-                 # but actually we just want unique IDs or unique Names?)
-                 # Use a set of unique IDs found
-                 unique_ids = list({c[1] for c in candidates})
+                if len(unique_ids) == 1:
+                    # Unique match found
+                    found_id = unique_ids[0]
+                    self.cache[category][norm_key] = found_id
+                    return found_id
 
-                 if len(unique_ids) == 1:
-                     # Found unique match! Use this ID.
-                     # Also cache this "Short Name" -> ID mapping so next time it's fast
-                     found_id = unique_ids[0]
-                     self.cache[cache_key][norm_key] = found_id
-                     return found_id
+                elif len(unique_ids) > 1:
+                    # Ambiguous
+                    if self.interactive:
+                        print(f"\n⚠️ Ambiguity for '{val_to_use}' ({category}):")
+                        options = []
+                        # Retrieve names for these IDs to show user
+                        for i, uid in enumerate(unique_ids):
+                            # We need to find the name in the index or query DB
+                            # candidates has (norm_full, id). Let's use norm_full or query DB?
+                            # DB query is safer for display.
+                            table = "Komponisten" if category == "komponist" else "Dirigenten" if category == "dirigent" else "Solisten"
+                            self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (uid,))
+                            res = self.new_cur.fetchone()
+                            name_display = f"{res[0]} {res[1]}" if res else f"ID {uid}"
+                            options.append((uid, name_display))
+                            print(f"   {i+1}: {name_display}")
 
-                 # If > 1: Ambiguous. We do nothing special, proceed to create new entry (or rely on later manual fix).
-                 # If 0: No match. Create new.
+                        print(f"   0: Create new '{val_to_use}'")
+                        print(f"   s: Skip")
 
-        # 4. Insert (using the potentially corrected original value 'val_to_use')
-        final_params = params
-        if val_to_use != lookup_val:
-            if cache_key in ['dirigent', 'solist', 'komponist']:
-                parts = self.split_name(val_to_use)
-                if cache_key == 'komponist':
-                    final_params = (*parts, "")
-                else:
-                    final_params = parts
-            elif cache_key in ['orchester', 'ort']:
-                final_params = (val_to_use,)
-            elif cache_key == 'werk':
-               pass
+                        choice = input("Select option: ").strip().lower()
+                        if choice == 's':
+                            logging.info(f"Skipped ambiguous '{val_to_use}'")
+                            return None
+                        elif choice == '0':
+                            pass # Proceed to insert
+                        elif choice.isdigit() and 1 <= int(choice) <= len(options):
+                            selected_id = options[int(choice)-1][0]
+                            self.cache[category][norm_key] = selected_id
+                            return selected_id
+                        else:
+                             logging.warning("Invalid choice. Creating new.")
+                    else:
+                        logging.warning(f"Ambiguous '{val_to_use}' skipped in non-interactive mode. Candidates: {len(unique_ids)}")
+                        return None # Skip
 
-        self.new_cur.execute(insert_sql, final_params)
-        new_id = self.new_cur.lastrowid
-        self.cache[cache_key][norm_key] = new_id
+        # 4. Insert
+        try:
+            # Prepare params if not raw
+            final_params = params
+            # Logic from original script: handle splitting if passed raw string in params?
+            # The caller should pass correct params.
+            # But wait, original `get_or_create` modified params based on `val_to_use`.
+            # If `val_to_use` changed due to correction map, we need to update params.
+            if val_to_use != value:
+                 if category in ['dirigent', 'solist', 'komponist']:
+                    parts = self.split_name(val_to_use)
+                    if category == 'komponist':
+                        final_params = (*parts, "")
+                    else:
+                        final_params = parts
+                 elif category in ['orchester', 'ort']:
+                    final_params = (val_to_use,)
 
-        # Update name index with the new entry
-        self.update_name_index(cache_key, val_to_use, new_id)
+            self.new_cur.execute(insert_sql, final_params)
+            new_id = self.new_cur.lastrowid
+            self.new_conn.commit() # Commit immediately? Or batch? Original did commit at end?
+            # Original: commit at end of transfer. But here we might run separately.
+            # Safer to commit if we want subsequent lookups to find it?
+            # Actually, insert gives us an ID. We cache it.
+            # If we crash, we lose it?
+            # Let's commit.
+            self.new_conn.commit()
 
-        return new_id
+            self.cache[category][norm_key] = new_id
+            self.update_name_index(category, val_to_use, new_id)
+            logging.info(f"Created {category}: {val_to_use}")
+            return new_id
+        except Error as e:
+            logging.error(f"Failed to insert {category} '{val_to_use}': {e}")
+            return None
 
-    def transfer(self):
-        print("🚀 Migration läuft...")
+    def lookup_entity(self, category, value):
+        """
+        Strict lookup. Returns ID if found (unique), None otherwise.
+        """
+        if not value: return None
+
+        # 1. Apply Correction
+        val_to_use = self.correction_map.get(value, value)
+        norm_key = self.normalize_name(val_to_use)
+
+        # 2. Cache Lookup
+        if norm_key in self.cache[category]:
+            return self.cache[category][norm_key]
+
+        # 3. Name-Only Lookup
+        if category in ['dirigent', 'komponist', 'solist']:
+            first, last = self.split_name(val_to_use)
+            if not first and last:
+                norm_last = self.normalize_name(last)
+                candidates = self.name_index[category].get(norm_last, [])
+                unique_ids = list({c[1] for c in candidates})
+
+                if len(unique_ids) == 1:
+                    return unique_ids[0]
+
+                # If ambiguous or 0, return None
+                if len(unique_ids) > 1:
+                    logging.warning(f"Lookup ambiguous for '{val_to_use}'")
+                return None
+
+        return None
+
+    # ============================================================
+    # ENTITY MIGRATION STUBS
+    # ============================================================
+
+    def migrate_solists(self):
+        logging.info("Starting Solist migration...")
+        self.old_cur.execute("SELECT DISTINCT Solist FROM MusicRecords WHERE Solist IS NOT NULL AND Solist != ''")
+        count = 0
+        for row in self.old_cur.fetchall():
+            val = row['Solist']
+            # Clean: remove 'u.a.'
+            val_clean = val.replace("u.a.", "").replace("u. a.", "").strip()
+            if not val_clean: continue
+            
+            # Split by comma
+            parts = [s.strip() for s in val_clean.split(',') if s.strip()]
+            for p in parts:
+                if self.ensure_entity('solist', p,
+                    "INSERT INTO Solisten (Vorname, Name) VALUES (%s, %s)",
+                    self.split_name(p)):
+                    count += 1
+        logging.info(f"Solist migration finished. Processed {count} entries.")
+
+    def migrate_composers(self):
+        logging.info("Starting Composer migration...")
+        self.old_cur.execute("SELECT DISTINCT Komponist FROM MusicRecords WHERE Komponist IS NOT NULL AND Komponist != ''")
+        count = 0
+        for row in self.old_cur.fetchall():
+            val = row['Komponist']
+            # Split
+            parts = self.split_komponist_string(val)
+            for p in parts:
+                if self.ensure_entity('komponist', p,
+                    "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
+                    (*self.split_name(p), "")):
+                    count += 1
+        logging.info(f"Composer migration finished. Processed {count} entries.")
+
+    def migrate_conductors(self):
+        logging.info("Starting Conductor migration...")
+        self.old_cur.execute("SELECT DISTINCT Dirigent FROM MusicRecords WHERE Dirigent IS NOT NULL AND Dirigent != ''")
+        count = 0
+        for row in self.old_cur.fetchall():
+            val = row['Dirigent']
+            if self.ensure_entity('dirigent', val,
+                "INSERT INTO Dirigenten (Vorname, Name) VALUES (%s, %s)",
+                self.split_name(val)):
+                count += 1
+        logging.info(f"Conductor migration finished. Processed {count} entries.")
+
+    def migrate_orchestras(self):
+        logging.info("Starting Orchestra migration...")
+        self.old_cur.execute("SELECT DISTINCT Orchester FROM MusicRecords WHERE Orchester IS NOT NULL AND Orchester != ''")
+        count = 0
+        for row in self.old_cur.fetchall():
+            val = row['Orchester']
+            if self.ensure_entity('orchester', val,
+                "INSERT INTO Orchester (Name) VALUES (%s)",
+                (val,)):
+                count += 1
+        logging.info(f"Orchestra migration finished. Processed {count} entries.")
+
+    def migrate_locations(self):
+        logging.info("Starting Location migration...")
+        self.old_cur.execute("SELECT DISTINCT Ort FROM MusicRecords WHERE Ort IS NOT NULL AND Ort != ''")
+        count = 0
+        for row in self.old_cur.fetchall():
+            val = row['Ort']
+            if self.ensure_entity('ort', val,
+                "INSERT INTO Orte (Name) VALUES (%s)",
+                (val,)):
+                count += 1
+        logging.info(f"Location migration finished. Processed {count} entries.")
+
+    def migrate_works(self):
+        logging.info("Starting Work migration...")
+        # Works are tricky because they depend on Composer.
+        # We need (Werk, Komponist) pairs from Old DB.
+        self.old_cur.execute("SELECT DISTINCT Werk, Komponist FROM MusicRecords WHERE Werk IS NOT NULL AND Werk != ''")
+        count = 0
+        skipped = 0
+
+        for row in self.old_cur.fetchall():
+            werk_name = row['Werk']
+            komp_str = row['Komponist']
+
+            # We need to resolve the composer(s).
+            # If multiple composers, we might have multiple works or "Todo" logic?
+            # Original script logic:
+            # If standard case (1 composer): Create Werk linked to Composer.
+            # If multiple composers: Create "Todo" works?
+            # User requirement: "check all entries in werke and add those who are not found"
+            # But "Werke" in old DB is just a string.
+            # In New DB, Work = (Name, ComposerId).
+
+            # So we must try to match the Composer string to an existing Composer ID.
+
+            komp_parts = self.split_komponist_string(komp_str)
+
+            if not komp_parts:
+                logging.warning(f"Work '{werk_name}' has no composer. Skipped.")
+                skipped += 1
+                continue
+
+            # Logic:
+            # 1. If 1 composer part -> Look up composer ID. If found, ensure Work exists.
+            # 2. If >1 composer parts ->
+            #    Original script: Create "Todo" works.
+            #    New Logic:
+            #    - The AI analysis was done during RECORD transfer in original script.
+            #    - Here we are just adding Master Data (Works).
+            #    - Without the AI/Context (Bewertung), we can't easily split "Beethoven / Mozart" -> "Sym 5 / Sym 40".
+            #    - The user didn't ask for AI here, just "add those who are not found".
+            #    - Maybe we should just use the first composer for the named work, and Todo for others?
+            #    - Or try to find ALL composers?
+
+            # Let's stick to: Try to find composer. If missing, LOG ERROR (as per "write a lot where entries could not be done").
+
+            # Simplification: Only handle the FIRST composer for the named work.
+            # (Because we don't know which work belongs to which composer if there are multiple, without AI/Context).
+
+            first_komp_str = komp_parts[0]
+            k_id = self.lookup_entity('komponist', first_komp_str)
+
+            if not k_id:
+                logging.error(f"Work '{werk_name}': Composer '{first_komp_str}' not found. Skipped.")
+                skipped += 1
+                continue
+
+            # Composer found. Ensure Work exists.
+            # Key for cache/lookup: "Name_ComposerId"
+            werk_key = f"{werk_name}_{k_id}"
+
+            # Check if exists (ensure_entity does this via cache, but cache key needs to be set up right)
+            # In ensure_entity:
+            # norm_key = self.normalize_name(value)
+            # We should pass the composite key as value? No, value is used for insert params usually.
+            # But 'werk' is special.
+            # ensure_entity takes (category, value, sql, params).
+            # For Werk:
+            # value = werk_key (so caching works on the composite)
+            # params = (werk_name, k_id)
+
+            if self.ensure_entity('werk', werk_key,
+                "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)",
+                (werk_name, k_id)):
+                count += 1
+
+        logging.info(f"Work migration finished. Processed {count}, Skipped {skipped}.")
+
+    def migrate_records(self):
+        logging.info("Starting MusicRecords & Documents migration...")
         self.old_cur.execute("SELECT * FROM MusicRecords")
         old_data = self.old_cur.fetchall()
 
+        success_count = 0
+        skipped_count = 0
+
         for row in old_data:
-            # 1. Stammdaten (Dirigent & Orchester)
-            d_id = self.get_or_create('dirigent', row['Dirigent'], 
-                "INSERT INTO Dirigenten (Vorname, Name) VALUES (%s, %s)", self.split_name(row['Dirigent'])) if row['Dirigent'] else None
-            
-            o_id = self.get_or_create('orchester', row['Orchester'], 
-                "INSERT INTO Orchester (Name) VALUES (%s)", (row['Orchester'],)) if row['Orchester'] else None
+            # 1. Resolve Dependencies
+            missing_deps = []
 
-            ort_id = self.get_or_create('ort', row['Ort'],
-                "INSERT INTO Orte (Name) VALUES (%s)", (row['Ort'],)) if row['Ort'] else None
+            # Dirigent
+            d_id = None
+            if row['Dirigent']:
+                d_id = self.lookup_entity('dirigent', row['Dirigent'])
+                if not d_id: missing_deps.append(f"Dirigent: {row['Dirigent']}")
 
-            # 2. Komponist & Werk
-            w_ids = [] # List of Work IDs to link
+            # Orchester
+            o_id = None
+            if row['Orchester']:
+                o_id = self.lookup_entity('orchester', row['Orchester'])
+                if not o_id: missing_deps.append(f"Orchester: {row['Orchester']}")
+
+            # Ort
+            ort_id = None
+            if row['Ort']:
+                ort_id = self.lookup_entity('ort', row['Ort'])
+                if not ort_id: missing_deps.append(f"Ort: {row['Ort']}")
+
+            # Solisten
+            s_ids = []
+            if row['Solist']:
+                solist_clean = row['Solist'].replace("u.a.", "").replace("u. a.", "").strip()
+                parts = [s.strip() for s in solist_clean.split(',') if s.strip()]
+                for p in parts:
+                    s_id = self.lookup_entity('solist', p)
+                    if s_id:
+                        s_ids.append(s_id)
+                    else:
+                        missing_deps.append(f"Solist: {p}")
+
+            # Werke
+            w_ids = []
+            bezeichnung = row['Werk'] # Default designation
 
             if row['Werk']:
-                komp_strings = self.split_komponist_string(row['Komponist'])
-                
-                # Check for AI triggers
-                k_raw = row['Komponist'] or ""
-                has_ua = "u.a." in k_raw.lower() or "u. a." in k_raw.lower()
+                komp_parts = self.split_komponist_string(row['Komponist'])
+                if not komp_parts:
+                     # If Werk exists but no Komponist? Rare but possible.
+                     # In migrate_works, we skipped.
+                     missing_deps.append(f"Werk (No Composer): {row['Werk']}")
+                else:
+                    # Try to find the work using the FIRST composer (consistent with migrate_works)
+                    first_komp_str = komp_parts[0]
+                    k_id = self.lookup_entity('komponist', first_komp_str)
 
-                ai_done = False
-                ai_komponisten_names = []
-
-                if (len(komp_strings) > 1 or has_ua) and self.client:
-                    # Trigger AI
-                    bewertung_ai = row['Bewertung1'] or ""
-                    print(f"🤖 AI Request for ID {row['Id']}: {k_raw} | {row['Werk']}")
-                    ai_items = self.analyze_with_ai(k_raw, row['Werk'], bewertung_ai)
-
-                    if ai_items:
-                        ai_done = True
-                        for item in ai_items:
-                            ai_k = item.get("Komponist")
-                            ai_w = item.get("Werk")
-
-                            if ai_k and ai_w:
-                                ai_komponisten_names.append(ai_k)
-                                # Create/Find Komponist
-                                k_id = self.get_or_create('komponist', ai_k,
-                                    "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
-                                    (*self.split_name(ai_k), ""))
-
-                                # Create/Find Werk
-                                werk_key = f"{ai_w}_{k_id}"
-                                w_id = self.get_or_create('werk', werk_key,
-                                    "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (ai_w, k_id))
-                                w_ids.append(w_id)
-                        print(f"   -> AI found {len(ai_items)} items.")
+                    if not k_id:
+                         missing_deps.append(f"Composer for Work: {first_komp_str}")
                     else:
-                        print("   -> AI returned no results. Falling back.")
-
-                if not ai_done:
-                    if len(komp_strings) <= 1:
-                        # Standard Case
-                        k_str = komp_strings[0] if komp_strings else None
-                        k_id = None
-                        if k_str:
-                            k_id = self.get_or_create('komponist', k_str,
-                                "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
-                                (*self.split_name(k_str), ""))
-
                         werk_key = f"{row['Werk']}_{k_id}"
-                        w_id = self.get_or_create('werk', werk_key,
-                            "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (row['Werk'], k_id))
-                        w_ids.append(w_id)
-                    else:
-                        # Multi-Composer Case -> Create "Todo X" Works for each
-                        for k_str in komp_strings:
-                            k_id = self.get_or_create('komponist', k_str,
-                                "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
-                                (*self.split_name(k_str), ""))
-
-                            # Create unique Todo work
-                            todo_name = f"Todo {self.todo_counter}"
-                            self.todo_counter += 1
-
-                            werk_key = f"{todo_name}_{k_id}"
-                            w_id = self.get_or_create('werk', werk_key,
-                                 "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (todo_name, k_id))
+                        w_id = self.lookup_entity('werk', werk_key)
+                        if w_id:
                             w_ids.append(w_id)
-
-
-            # 3. MusicRecord Hauptdatensatz (OHNE die alten Spalten 'Werk'/'Komponist')
-            bewertung = f"{row['Bewertung1']}\n{row['Bewertung2']}".strip()
-            sql_mr = """INSERT INTO MusicRecords 
-                        (Id, Bezeichnung, Datum, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+                        else:
+                            missing_deps.append(f"Werk: {row['Werk']} ({first_komp_str})")
             
-            # Determine 'Bezeichnung'
-            bezeichnung = row['Werk']
-            if ai_done and ai_komponisten_names:
-                bezeichnung = f"Konzert ({', '.join(ai_komponisten_names)})"
+            if missing_deps:
+                logging.error(f"Record {row['Id']} skipped. Missing: {', '.join(missing_deps)}")
+                skipped_count += 1
+                continue
 
-            self.new_cur.execute(sql_mr, (
-                row['Id'], bezeichnung, row['Datum'], row['Spielsaison'],
-                bewertung, ort_id, d_id, o_id
-            ))
+            # 2. Date Check
+            try:
+                self.new_cur.execute("SELECT Id FROM MusicRecords WHERE Datum = %s", (row['Datum'],))
+                existing = self.new_cur.fetchall()
 
-            # 4. n:m Beziehung: MusicRecord <-> Werk
-            for w_id in w_ids:
-                if w_id:
-                    self.new_cur.execute(
-                        "INSERT INTO MusicRecordWerk (MusicRecordsId, WerkeId) VALUES (%s, %s)",
-                        (row['Id'], w_id)
+                if len(existing) > 1:
+                    logging.error(f"Record {row['Id']} skipped. Multiple records exist for date {row['Datum']}.")
+                    skipped_count += 1
+                    continue
+
+                if len(existing) == 1:
+                    del_id = existing[0]['Id'] if isinstance(existing[0], dict) else existing[0][0] # Handle tuple/dict cursor
+                    logging.info(f"Overwriting existing record for date {row['Datum']} (ID: {del_id})")
+                    # Manual cleanup of n:m if needed? Assuming ON DELETE CASCADE.
+                    self.new_cur.execute("DELETE FROM MusicRecords WHERE Id = %s", (del_id,))
+            except Error as e:
+                 logging.error(f"Database error during date check/delete for {row['Id']}: {e}")
+                 skipped_count += 1
+                 continue
+
+            # 3. Insert Record
+            try:
+                bewertung = f"{row['Bewertung1']}\n{row['Bewertung2']}".strip()
+                sql_mr = """INSERT INTO MusicRecords
+                            (Id, Bezeichnung, Datum, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+
+                self.new_cur.execute(sql_mr, (
+                    row['Id'], bezeichnung, row['Datum'], row['Spielsaison'],
+                    bewertung, ort_id, d_id, o_id
+                ))
+
+                # Links
+                for w_id in w_ids:
+                    self.new_cur.execute("INSERT INTO MusicRecordWerk (MusicRecordsId, WerkeId) VALUES (%s, %s)", (row['Id'], w_id))
+
+                for s_id in s_ids:
+                    self.new_cur.execute("INSERT INTO MusicRecordSolist (MusicRecordsId, SolistenId) VALUES (%s, %s)", (row['Id'], s_id))
+
+                # Documents
+                self.old_cur.execute("SELECT * FROM Documents WHERE MusicRecordId = %s", (row['Id'],))
+                docs = self.old_cur.fetchall()
+                for doc in docs:
+                     self.new_cur.execute(
+                        "INSERT INTO Documents (Id, FileName, EncryptedName, DocumentType, MusicRecordId) VALUES (%s, %s, %s, %s, %s)",
+                        (doc['Id'], doc['FileName'], doc['EncryptedName'], doc['DocumentType'], row['Id'])
                     )
 
-            # 5. n:m Beziehung: MusicRecord <-> Solisten
-            if row['Solist']:
-                # Clean string before splitting: remove 'u.a.'/'u. a.', then trim
-                solist_clean = row['Solist'].replace("u.a.", "").replace("u. a.", "").strip()
-                if solist_clean:
-                    for s_full in [s.strip() for s in solist_clean.split(',')]:
-                        if not s_full: continue
-                        s_id = self.get_or_create('solist', s_full,
-                            "INSERT INTO Solisten (Vorname, Name) VALUES (%s, %s)", self.split_name(s_full))
+                self.new_conn.commit()
+                success_count += 1
 
-                        self.new_cur.execute(
-                            "INSERT INTO MusicRecordSolist (MusicRecordsId, SolistenId) VALUES (%s, %s)",
-                            (row['Id'], s_id)
-                        )
+            except Error as e:
+                logging.error(f"Failed to insert Record {row['Id']}: {e}")
+                skipped_count += 1
 
-        # 6. Documents
-        print("📂 Migriere Dokumente...")
-        self.old_cur.execute("SELECT * FROM Documents")
-        old_docs = self.old_cur.fetchall()
-
-        for doc in old_docs:
-            self.new_cur.execute(
-                "INSERT INTO Documents (Id, FileName, EncryptedName, DocumentType, MusicRecordId) VALUES (%s, %s, %s, %s, %s)",
-                (doc['Id'], doc['FileName'], doc['EncryptedName'], doc['DocumentType'], doc['MusicRecordId'])
-            )
-
-        self.new_conn.commit()
-        print(f"✅ Fertig! {len(old_data)} Records und {len(old_docs)} Dokumente migriert.")
+        logging.info(f"Records migration finished. Success: {success_count}, Skipped: {skipped_count}")
 
     def close(self):
         self.old_cur.close()
@@ -509,31 +600,51 @@ class MigrationSpecialist:
         if self.new_conn: self.new_conn.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--delete', action='store_true', help="Löscht existierende Daten in der Ziel-DB")
-    parser.add_argument('--transfer', action='store_true', help="Führt die Migration durch")
-    parser.add_argument('--generate-map', action='store_true', help="Erstellt eine JSON-Datei mit gefundenen Duplikaten (Korrektur-Map)")
-    parser.add_argument('--map', type=str, help="Pfad zur Korrektur-Map JSON-Datei")
+    parser = argparse.ArgumentParser(description="Migration Tool")
+
+    # Actions
+    parser.add_argument('--add-solist', action='store_true', help="Migrate Solists")
+    parser.add_argument('--add-composer', action='store_true', help="Migrate Composers")
+    parser.add_argument('--add-work', action='store_true', help="Migrate Works")
+    parser.add_argument('--add-conductor', action='store_true', help="Migrate Conductors")
+    parser.add_argument('--add-orchestra', action='store_true', help="Migrate Orchestras")
+    parser.add_argument('--add-location', action='store_true', help="Migrate Locations")
+    parser.add_argument('--notes', action='store_true', help="Migrate MusicRecords and Documents")
+
+    # Options
+    parser.add_argument('--interactive', action='store_true', help="Enable interactive mode for ambiguities")
+    parser.add_argument('--delete', action='store_true', help="Clear destination DB before starting")
+    parser.add_argument('--map', type=str, help="Path to correction map JSON")
+
     args = parser.parse_args()
     
-    # Init connection
-    # If only generating map, we don't strictly need New DB connection, but let's keep it simple or optimize
-    only_old = args.generate_map and not args.transfer and not args.delete
-    spec = MigrationSpecialist(only_old_db=only_old)
+    spec = MigrationSpecialist(interactive=args.interactive)
 
-    if args.generate_map:
-        output_file = "correction-map.json"
-        # If user provided a path via --map? Or just default?
-        # User said: "an options --generate-map where all doubles are exported to (correction-map.json)"
-        # Use default name or if map arg is present use that?
-        # Let's assume default unless map arg is meant for input.
-        # Usually --map is input. Let's output to "correction-map.json" by default.
-        spec.generate_correction_map("correction-map.json")
-
-    if args.map and args.transfer:
+    if args.map:
         spec.load_correction_map(args.map)
 
-    if args.delete: spec.clear_new_db()
-    if args.transfer: spec.transfer()
+    if args.delete:
+        spec.clear_new_db()
+
+    if args.add_solist:
+        spec.migrate_solists()
+
+    if args.add_composer:
+        spec.migrate_composers()
+
+    if args.add_conductor:
+        spec.migrate_conductors()
+
+    if args.add_orchestra:
+        spec.migrate_orchestras()
+
+    if args.add_location:
+        spec.migrate_locations()
+
+    if args.add_work:
+        spec.migrate_works()
+
+    if args.notes:
+        spec.migrate_records()
 
     spec.close()
