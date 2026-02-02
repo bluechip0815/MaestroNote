@@ -539,7 +539,7 @@ class MigrationSpecialist:
         logging.info(f"Work migration finished. Processed {count}, Skipped {skipped}.")
 
     def migrate_records(self):
-        logging.info("Starting MusicRecords & Documents migration...")
+        logging.info("Starting MusicRecords migration (without Documents)...")
         self.old_cur.execute("SELECT * FROM MusicRecords")
         old_data = self.old_cur.fetchall()
 
@@ -610,9 +610,24 @@ class MigrationSpecialist:
                 skipped_count += 1
                 continue
 
-            # 2. Date Check
+            # NEW: Prepare data for insertion/comparison
+            bewertung = f"{row['Bewertung1']}\n{row['Bewertung2']}".strip()
+            # New record data structure
+            new_record_data = {
+                'Datum': row['Datum'],
+                'Spielsaison': row['Spielsaison'],
+                'Bewertung': bewertung,
+                'OrtId': ort_id,
+                'DirigentId': d_id,
+                'OrchesterId': o_id,
+                'Bezeichnung': bezeichnung,
+                'Werke': set(w_ids),
+                'Solisten': set(s_ids)
+            }
+
+            # 2. Date Check & Comparison
             try:
-                self.new_cur.execute("SELECT Id FROM MusicRecords WHERE Datum = %s", (row['Datum'],))
+                self.new_cur.execute("SELECT Id, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId FROM MusicRecords WHERE Datum = %s", (row['Datum'],))
                 existing = self.new_cur.fetchall()
 
                 if len(existing) > 1:
@@ -621,10 +636,64 @@ class MigrationSpecialist:
                     continue
 
                 if len(existing) == 1:
-                    del_id = existing[0]['Id'] if isinstance(existing[0], dict) else existing[0][0] # Handle tuple/dict cursor
-                    logging.info(f"Overwriting existing record for date {row['Datum']} (ID: {del_id})")
-                    # Manual cleanup of n:m if needed? Assuming ON DELETE CASCADE.
-                    self.new_cur.execute("DELETE FROM MusicRecords WHERE Id = %s", (del_id,))
+                    ex_row = existing[0]
+                    # Handle tuple vs dict cursor. Standard cursor is tuple unless dictionary=True.
+                    # We initialized self.new_cur as self.new_conn.cursor() which is tuple.
+                    # Indexes: 0:Id, 1:Spielsaison, 2:Bewertung, 3:OrtId, 4:DirigentId, 5:OrchesterId
+                    ex_id = ex_row[0]
+
+                    # Fetch relations for comparison
+                    self.new_cur.execute("SELECT WerkeId FROM MusicRecordWerk WHERE MusicRecordsId = %s", (ex_id,))
+                    ex_w_ids = {r[0] for r in self.new_cur.fetchall()}
+
+                    self.new_cur.execute("SELECT SolistenId FROM MusicRecordSolist WHERE MusicRecordsId = %s", (ex_id,))
+                    ex_s_ids = {r[0] for r in self.new_cur.fetchall()}
+
+                    def norm_str(s): return (s or "").strip()
+
+                    ex_data = {
+                        'Spielsaison': ex_row[1],
+                        'Bewertung': ex_row[2],
+                        'OrtId': ex_row[3],
+                        'DirigentId': ex_row[4],
+                        'OrchesterId': ex_row[5],
+                        'Werke': ex_w_ids,
+                        'Solisten': ex_s_ids
+                    }
+
+                    # Compare
+                    is_diff = False
+                    if norm_str(ex_data['Spielsaison']) != norm_str(new_record_data['Spielsaison']): is_diff = True
+                    if norm_str(ex_data['Bewertung']) != norm_str(new_record_data['Bewertung']): is_diff = True
+                    if ex_data['OrtId'] != new_record_data['OrtId']: is_diff = True
+                    if ex_data['DirigentId'] != new_record_data['DirigentId']: is_diff = True
+                    if ex_data['OrchesterId'] != new_record_data['OrchesterId']: is_diff = True
+                    if ex_data['Werke'] != new_record_data['Werke']: is_diff = True
+                    if ex_data['Solisten'] != new_record_data['Solisten']: is_diff = True
+
+                    if not is_diff:
+                        logging.info(f"Skipping identical record for {row['Datum']}")
+                        continue
+
+                    # Conflict
+                    do_overwrite = False
+                    if self.interactive:
+                        print(f"\n⚠️ Conflict for Date {row['Datum']}:")
+                        print(f"   Existing: {ex_data}")
+                        print(f"   New:      {new_record_data}")
+                        choice = input("(s)kip, (o)verwrite? ").strip().lower()
+                        if choice == 'o': do_overwrite = True
+                        else: logging.info(f"Skipping conflict for {row['Datum']}")
+                    else:
+                        logging.info(f"Skipping conflict (non-interactive) for {row['Datum']}")
+                        continue # Skip
+
+                    if do_overwrite:
+                        self.new_cur.execute("DELETE FROM MusicRecords WHERE Id = %s", (ex_id,))
+                        logging.info(f"Deleted existing record {ex_id} for overwrite.")
+                    else:
+                        continue
+
             except Error as e:
                  logging.error(f"Database error during date check/delete for {row['Id']}: {e}")
                  skipped_count += 1
@@ -632,7 +701,6 @@ class MigrationSpecialist:
 
             # 3. Insert Record
             try:
-                bewertung = f"{row['Bewertung1']}\n{row['Bewertung2']}".strip()
                 sql_mr = """INSERT INTO MusicRecords
                             (Id, Bezeichnung, Datum, Spielsaison, Bewertung, OrtId, DirigentId, OrchesterId)
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
@@ -649,15 +717,6 @@ class MigrationSpecialist:
                 for s_id in s_ids:
                     self.new_cur.execute("INSERT INTO MusicRecordSolist (MusicRecordsId, SolistenId) VALUES (%s, %s)", (row['Id'], s_id))
 
-                # Documents
-                self.old_cur.execute("SELECT * FROM Documents WHERE MusicRecordId = %s", (row['Id'],))
-                docs = self.old_cur.fetchall()
-                for doc in docs:
-                     self.new_cur.execute(
-                        "INSERT INTO Documents (Id, FileName, EncryptedName, DocumentType, MusicRecordId) VALUES (%s, %s, %s, %s, %s)",
-                        (doc['Id'], doc['FileName'], doc['EncryptedName'], doc['DocumentType'], row['Id'])
-                    )
-
                 self.new_conn.commit()
                 success_count += 1
 
@@ -666,6 +725,55 @@ class MigrationSpecialist:
                 skipped_count += 1
 
         logging.info(f"Records migration finished. Success: {success_count}, Skipped: {skipped_count}")
+
+    def migrate_documents(self):
+        logging.info("Starting Documents migration...")
+        self.old_cur.execute("SELECT * FROM Documents")
+        docs = self.old_cur.fetchall()
+
+        count = 0
+        skipped = 0
+
+        for doc in docs:
+            # Check if MusicRecord exists
+            self.new_cur.execute("SELECT Id FROM MusicRecords WHERE Id = %s", (doc['MusicRecordId'],))
+            res = self.new_cur.fetchone()
+
+            if not res:
+                logging.warning(f"Document {doc['Id']} skipped: MusicRecord {doc['MusicRecordId']} not found.")
+                skipped += 1
+                continue
+
+            try:
+                self.new_cur.execute(
+                    "INSERT INTO Documents (Id, FileName, EncryptedName, DocumentType, MusicRecordId) VALUES (%s, %s, %s, %s, %s)",
+                    (doc['Id'], doc['FileName'], doc['EncryptedName'], doc['DocumentType'], doc['MusicRecordId'])
+                )
+                count += 1
+            except Error as e:
+                logging.error(f"Failed to insert Document {doc['Id']}: {e}")
+                skipped += 1
+
+        self.new_conn.commit()
+        logging.info(f"Documents migration finished. Processed {count}, Skipped {skipped}.")
+
+    def clear_documents(self):
+        logging.info("Clearing Documents table...")
+        try:
+            self.new_cur.execute("TRUNCATE TABLE Documents")
+            self.new_conn.commit()
+            logging.info("Documents table cleared.")
+        except Error as e:
+            logging.error(f"Failed to clear Documents: {e}")
+
+    def clear_notes(self):
+        logging.info("Clearing Notes (Bewertung) in MusicRecords...")
+        try:
+            self.new_cur.execute("UPDATE MusicRecords SET Bewertung = ''")
+            self.new_conn.commit()
+            logging.info("Notes cleared.")
+        except Error as e:
+            logging.error(f"Failed to clear Notes: {e}")
 
     def close(self):
         self.old_cur.close()
@@ -683,7 +791,10 @@ if __name__ == "__main__":
     parser.add_argument('--add-conductor', action='store_true', help="Migrate Conductors")
     parser.add_argument('--add-orchestra', action='store_true', help="Migrate Orchestras")
     parser.add_argument('--add-location', action='store_true', help="Migrate Locations")
-    parser.add_argument('--notes', action='store_true', help="Migrate MusicRecords and Documents")
+    parser.add_argument('--notes', action='store_true', help="Migrate MusicRecords (without Documents)")
+    parser.add_argument('--documents', action='store_true', help="Migrate Documents table")
+    parser.add_argument('--delete-doc', action='store_true', help="Clear Document table")
+    parser.add_argument('--delete-note', action='store_true', help="Remove Bemerkung only")
 
     # Options
     parser.add_argument('--interactive', action='store_true', help="Enable interactive mode for ambiguities")
@@ -699,6 +810,12 @@ if __name__ == "__main__":
 
     if args.delete:
         spec.clear_new_db()
+
+    if args.delete_doc:
+        spec.clear_documents()
+
+    if args.delete_note:
+        spec.clear_notes()
 
     if args.add_solist:
         spec.migrate_solists()
@@ -720,5 +837,8 @@ if __name__ == "__main__":
 
     if args.notes:
         spec.migrate_records()
+
+    if args.documents:
+        spec.migrate_documents()
 
     spec.close()
