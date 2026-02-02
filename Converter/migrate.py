@@ -76,6 +76,46 @@ class MigrationSpecialist:
         # Load existing data from New DB
         self.load_existing_data()
 
+        # Load known names from data.txt
+        self.known_names = {}
+        self.load_known_names()
+
+    def load_known_names(self):
+        """
+        Loads name corrections/completions from data.txt.
+        Format per line: Vorname; Name
+        Stores in self.known_names: normalized_last_name -> [full_name_variants]
+        """
+        filepath = os.path.join(os.path.dirname(__file__), 'data.txt')
+        if not os.path.exists(filepath):
+            return
+
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if ';' not in line: continue
+                    parts = line.strip().split(';')
+                    if len(parts) < 2: continue
+
+                    vorname = parts[0].strip()
+                    nachname = parts[1].strip()
+
+                    if not vorname or not nachname: continue
+
+                    full_name = f"{vorname} {nachname}"
+                    norm_last = self.normalize_name(nachname)
+
+                    if norm_last not in self.known_names:
+                        self.known_names[norm_last] = []
+
+                    # Avoid exact duplicates
+                    if full_name not in self.known_names[norm_last]:
+                        self.known_names[norm_last].append(full_name)
+
+            logging.info(f"✓ Known names loaded ({len(self.known_names)} keys).")
+        except Exception as e:
+            logging.error(f"❌ Error loading data.txt: {e}")
+
     def normalize_name(self, name):
         if not name: return ""
         s = name.lower()
@@ -133,6 +173,19 @@ class MigrationSpecialist:
             # 3. Person Check (Missing Name Parts)
             if category in ['dirigent', 'komponist', 'solist']:
                 first, last = self.split_name(current_val)
+
+                # Attempt lookup from data.txt
+                if (not first or not last) and last:
+                    norm_last = self.normalize_name(last)
+                    candidates = self.known_names.get(norm_last, [])
+                    if len(candidates) == 1:
+                        current_val = candidates[0]
+                        logging.info(f"Auto-corrected '{last}' to '{current_val}' via data.txt")
+                        # Re-split to confirm
+                        first, last = self.split_name(current_val)
+                    elif len(candidates) > 1:
+                        logging.warning(f"Ambiguous match for '{last}' in data.txt: {candidates}")
+
                 if not first or not last:
                     msg = f"Value '{current_val}' is missing First or Last Name."
                     if self.interactive:
