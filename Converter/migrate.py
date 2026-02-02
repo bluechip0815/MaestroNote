@@ -137,11 +137,12 @@ class MigrationSpecialist:
                     msg = f"Value '{current_val}' is missing First or Last Name."
                     if self.interactive:
                         print(f"\n⚠️ {msg}")
-                        choice = input("(s)kip, (e)dit? ").strip().lower()
+                        choice = input("(s)kip, (e)dit, (o)k? ").strip().lower()
                         if choice == 's': return None
                         if choice == 'e':
                             current_val = input("Enter full correct name: ").strip()
                             continue
+                        if choice == 'o': return current_val
                     else:
                         logging.info(f"Skipping '{current_val}' (incomplete name)")
                         return None

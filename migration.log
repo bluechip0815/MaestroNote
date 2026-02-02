@@ -1,8 +1,0 @@
-2026-02-01 19:20:21,755 - INFO - Skipping junk entry: 'etc.'
-2026-02-01 19:20:21,756 - INFO - Skipping junk entry: 'u.a.'
-2026-02-01 19:20:21,756 - INFO - Skipping junk entry: 'Etc.'
-2026-02-01 19:20:21,756 - INFO - Skipping junk entry: 'u. a.'
-2026-02-01 19:20:21,757 - INFO - Skipping 'Li' (too short)
-2026-02-01 19:20:21,757 - INFO - Skipping 'Au' (too short)
-2026-02-01 19:20:21,758 - INFO - Skipping 'Beethoven' (incomplete name)
-2026-02-01 19:20:21,758 - INFO - Skipping 'Karajan' (incomplete name)
