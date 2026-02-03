@@ -1,47 +1,29 @@
-2026-02-03 21:04:51,356 - INFO - Loading existing data from new database...
-2026-02-03 21:04:51,357 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,357 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,357 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,357 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,357 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,357 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,358 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 21:04:51,358 - INFO - ℹ️ Info: Part 'Beethoven' from 'Beethoven' not found in correction map.
-2026-02-03 21:04:51,359 - INFO - Loading existing data from new database...
-2026-02-03 21:04:51,359 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,359 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,359 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,359 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,359 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,359 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,359 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 21:04:51,359 - INFO - ℹ️ Info: Part 'Ludwig' from 'Ludwig van Beethoven' not found in correction map.
-2026-02-03 21:04:51,359 - INFO - ℹ️ Info: Part 'van' from 'Ludwig van Beethoven' not found in correction map.
-2026-02-03 21:04:51,360 - INFO - Loading existing data from new database...
-2026-02-03 21:04:51,360 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,360 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,360 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,360 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,360 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,360 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,360 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 21:04:51,360 - INFO - Loading existing data from new database...
-2026-02-03 21:04:51,360 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,360 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,361 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,361 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,361 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,361 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,361 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 21:04:51,361 - INFO - ℹ️ Info: Part 'John' from 'John Smith' not found in correction map.
-2026-02-03 21:04:51,361 - INFO - ℹ️ Info: Part 'Smith' from 'John Smith' not found in correction map.
-2026-02-03 21:04:51,361 - INFO - Loading existing data from new database...
-2026-02-03 21:04:51,361 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,361 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,361 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,361 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,363 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,363 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 21:04:51,363 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 21:04:51,363 - INFO - ℹ️ Info: Part 'Beethoven' from 'Beethoven' not found in correction map.
-2026-02-03 21:04:51,363 - INFO - ℹ️ Info: Part 'Mozart' from 'Mozart' not found in correction map.
+2026-02-03 22:26:29,573 - INFO - ✓ Alte Datenbank verbunden.
+2026-02-03 22:26:29,574 - INFO - ✓ Neue Datenbank verbunden.
+2026-02-03 22:26:29,574 - INFO - Loading existing data from new database...
+2026-02-03 22:26:29,576 - INFO - ✓ Korrektur-Map geladen (91 Einträge).
+2026-02-03 22:26:29,576 - INFO - Created komponist: New; Name
+2026-02-03 22:26:29,577 - INFO - ✓ Alte Datenbank verbunden.
+2026-02-03 22:26:29,578 - INFO - ✓ Neue Datenbank verbunden.
+2026-02-03 22:26:29,578 - INFO - Loading existing data from new database...
+2026-02-03 22:26:29,579 - INFO - ✓ Korrektur-Map geladen (91 Einträge).
+2026-02-03 22:26:29,580 - INFO - ➕ Added to Map: 'Zimmer' -> 'Hans; Zimmer'
+2026-02-03 22:26:29,581 - INFO - Created komponist: Hans Zimmer
+2026-02-03 22:26:29,582 - INFO - ✓ Alte Datenbank verbunden.
+2026-02-03 22:26:29,582 - INFO - ✓ Neue Datenbank verbunden.
+2026-02-03 22:26:29,582 - INFO - Loading existing data from new database...
+2026-02-03 22:26:29,583 - INFO - ✓ Korrektur-Map geladen (91 Einträge).
+2026-02-03 22:26:29,584 - INFO - Skipping 'Hans' (incomplete name)
+2026-02-03 22:26:29,584 - ERROR - ❌ Error: Invalid input 'Hans' (Original: 'Hans') skipped.
+2026-02-03 22:26:29,585 - INFO - ✓ Alte Datenbank verbunden.
+2026-02-03 22:26:29,585 - INFO - ✓ Neue Datenbank verbunden.
+2026-02-03 22:26:29,585 - INFO - Loading existing data from new database...
+2026-02-03 22:26:29,587 - INFO - ✓ Korrektur-Map geladen (91 Einträge).
+2026-02-03 22:26:29,587 - INFO - ➕ Added to Map: 'Bach' -> 'Johann Sebastian; Bach'
+2026-02-03 22:26:29,588 - INFO - ✓ Alte Datenbank verbunden.
+2026-02-03 22:26:29,588 - INFO - ✓ Neue Datenbank verbunden.
+2026-02-03 22:26:29,588 - INFO - Loading existing data from new database...
+2026-02-03 22:26:29,591 - INFO - ✓ Korrektur-Map geladen (91 Einträge).
+2026-02-03 22:26:29,591 - INFO - Auto-accepting valid person: 'Hans Zimmer'
+2026-02-03 22:26:29,591 - INFO - ➕ Added to Map: 'Hans Zimmer' -> 'Hans; Zimmer'
+2026-02-03 22:26:29,592 - INFO - Created komponist: Hans Zimmer

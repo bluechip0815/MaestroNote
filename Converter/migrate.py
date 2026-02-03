@@ -259,6 +259,47 @@ class MigrationSpecialist:
         except Exception as e:
             logging.error(f"❌ Fehler beim Laden der Korrektur-Map: {e}")
 
+    def save_correction_map(self, filepath):
+        try:
+            sorted_map = dict(sorted(self.correction_map.items()))
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(sorted_map, f, ensure_ascii=False, indent=4)
+            logging.info(f"✓ Correction map saved to {filepath} ({len(self.correction_map)} entries).")
+        except Exception as e:
+            logging.error(f"❌ Failed to save correction map: {e}")
+
+    def update_map(self, original_key, resolved_value_parts):
+        """
+        Updates the correction map with a new entry.
+        resolved_value_parts: Tuple/List of name parts (e.g. ("Johann", "Bach")) or single string.
+        """
+        if not original_key: return
+
+        # Construct value string "First; Last" or "Value"
+        if isinstance(resolved_value_parts, (list, tuple)):
+            if len(resolved_value_parts) == 2:
+                val_str = f"{resolved_value_parts[0]}; {resolved_value_parts[1]}"
+            elif len(resolved_value_parts) == 1:
+                val_str = f"; {resolved_value_parts[0]}" # Authorized single name?
+            else:
+                val_str = "; ".join(resolved_value_parts)
+        else:
+            val_str = str(resolved_value_parts)
+            # Check if it needs semicolon structure (Person vs Other)
+            # But here we assume resolved_value_parts comes from split_name or similar
+            # If it's a simple string like "Berlin", we might want "; Berlin" if it's a Location?
+            # Existing map has "Semperoper": "; Semperoper".
+            # But "Orchester" -> "Name".
+            # Let's rely on how split_name produced the parts.
+
+        # Clean up double spaces/semicolons
+        val_str = val_str.strip()
+        if val_str.startswith(";"): val_str = "; " + val_str[1:].strip()
+
+        if original_key not in self.correction_map:
+            self.correction_map[original_key] = val_str
+            logging.info(f"➕ Added to Map: '{original_key}' -> '{val_str}'")
+
     def clear_new_db(self):
         logging.info("⚠️ Lösche neue Datenbank für frischen Import...")
         tables = [
@@ -341,41 +382,43 @@ class MigrationSpecialist:
 
     def ensure_entity(self, category, value, insert_sql, params):
         """
-        Tries to find the entity. If not found, creates it.
-        Handles ambiguities via interactive mode or skipping.
-        Returns ID or None if skipped.
+        Tries to find the entity using Map -> Cache -> NameIndex.
+        If found or valid new entity, updates Map and creates in DB.
+        If invalid/unknown and not fixed, logs error and skips.
         """
         if not value: return None
 
         # 1. Apply Correction Map (Priority 1)
-        # If in map, we trust the mapped value ("authorized").
         val_to_use = value
-        authorized = False
+        in_map = False
 
         if value in self.correction_map:
             val_to_use = self.correction_map[value]
-            authorized = True
+            in_map = True
 
         while True:
             norm_key = self.normalize_name(val_to_use)
 
-            # 2. Cache Lookup (Priority 2: Complete Entry)
+            # 2. Cache Lookup (Priority 2: Existing Exact Match)
             if norm_key in self.cache[category]:
+                # Found in DB.
+                # If we started with a value NOT in map (and it matched DB),
+                # we should add this valid mapping to the map.
+                if not in_map:
+                    # We need the correct formatting (First; Last) from DB or inferred from val_to_use?
+                    # val_to_use matches DB entry.
+                    # For Person: split_name(val_to_use).
+                    if category in ['dirigent', 'komponist', 'solist']:
+                        parts = self.split_name(val_to_use)
+                        self.update_map(value, parts)
+                    else:
+                        # Orchester/Ort: usually just name.
+                        self.update_map(value, (val_to_use, ""))
+
                 return self.cache[category][norm_key]
 
-            # 3. Validation
-            # Returns cleaned value or None (if skipped).
-            # If user edits here, val_to_use changes.
-            validated_val = self.validate_and_fix_input(category, val_to_use, authorized=authorized)
-            if not validated_val:
-                return None # Skip
-
-            if validated_val != val_to_use:
-                val_to_use = validated_val
-                authorized = True # User manually edited/accepted it
-                continue # Restart loop to check cache/map for new value
-
-            # 4. Name-Only Lookup (for Person categories)
+            # 3. Name-Only Lookup (Ambiguity Check)
+            # We do this BEFORE strict validation, to catch cases like "Bach" (Last name only).
             if category in ['dirigent', 'komponist', 'solist']:
                 first, last = self.split_name(val_to_use)
                 if not first and last: # Name only provided (e.g. "Beethoven")
@@ -384,13 +427,27 @@ class MigrationSpecialist:
                     unique_ids = list({c[1] for c in candidates})
 
                     if len(unique_ids) == 1:
-                        # Unique match found
+                        # Unique match found!
                         found_id = unique_ids[0]
                         self.cache[category][norm_key] = found_id
+
+                        # Fetch the full name to update map
+                        table = "Komponisten" if category == "komponist" else "Dirigenten" if category == "dirigent" else "Solisten"
+                        try:
+                            self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (found_id,))
+                            res = self.new_cur.fetchone()
+                            if res:
+                                # Add mapping: "Beethoven" -> "Ludwig; v. Beethoven"
+                                self.update_map(value, (res[0], res[1]))
+                        except: pass
+
                         return found_id
 
                     elif len(unique_ids) > 1:
                         # Ambiguous
+                        selected_id = None
+                        selected_name = None
+
                         if self.interactive:
                             print(f"\n⚠️ Ambiguity for '{val_to_use}' ({category}):")
                             options = []
@@ -399,7 +456,7 @@ class MigrationSpecialist:
                                 self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (uid,))
                                 res = self.new_cur.fetchone()
                                 name_display = f"{res[0]} {res[1]}" if res else f"ID {uid}"
-                                options.append((uid, name_display))
+                                options.append((uid, name_display, res)) # Store res for map update
                                 print(f"   {i+1}: {name_display}")
 
                             print(f"   0: Create new '{val_to_use}'")
@@ -407,78 +464,128 @@ class MigrationSpecialist:
 
                             choice = input("Select option: ").strip().lower()
                             if choice == 's':
-                                logging.info(f"Skipped ambiguous '{val_to_use}'")
+                                logging.error(f"❌ Error: Ambiguous '{val_to_use}' skipped by user.")
                                 return None
                             elif choice == '0':
-                                authorized = True # Proceed
+                                pass # Proceed to create new
                             elif choice.isdigit() and 1 <= int(choice) <= len(options):
                                 selected_id = options[int(choice)-1][0]
+                                res_tuple = options[int(choice)-1][2]
+
+                                # Update Map
+                                self.update_map(value, (res_tuple[0], res_tuple[1]))
+
                                 self.cache[category][norm_key] = selected_id
                                 return selected_id
-                            else:
-                                logging.warning("Invalid choice. Creating new.")
-                                authorized = True
                         else:
-                            logging.warning(f"Ambiguous '{val_to_use}' skipped in non-interactive mode. Candidates: {len(unique_ids)}")
-                            return None # Skip
+                            logging.error(f"❌ Error: Ambiguous '{val_to_use}' skipped (non-interactive).")
+                            return None
 
-            # 5. Unknown Entity Check (Priority 3: Auto-Authorize Valid Entries or Ask)
-            if not authorized:
+            # 4. Validation
+            validated_val = self.validate_and_fix_input(category, val_to_use, authorized=in_map)
+
+            # If validation failed (returned None), we log error and return None.
+            if not validated_val:
+                logging.error(f"❌ Error: Invalid input '{val_to_use}' (Original: '{value}') skipped.")
+                return None
+
+            if validated_val != val_to_use:
+                # User edited it in validation step.
+                # We treat this as a manual fix.
+                # Update map with Original -> New Value
+                if category in ['dirigent', 'komponist', 'solist']:
+                     self.update_map(value, self.split_name(validated_val))
+                else:
+                     self.update_map(value, (validated_val, ""))
+
+                val_to_use = validated_val
+                in_map = True # Treated as authorized now
+                continue # Restart loop to check cache
+
+            # 5. Create New Entity (Auto-Authorize or Ask)
+            if not in_map:
                 # Check for "Valid" entry to auto-authorize
                 is_valid_auto = False
 
                 if category in ['dirigent', 'komponist', 'solist']:
-                    # Person: Needs First + Last Name
                     f, l = self.split_name(val_to_use)
                     if f and l:
                         is_valid_auto = True
                         logging.info(f"Auto-accepting valid person: '{val_to_use}'")
 
                 elif category in ['orchester', 'ort']:
-                    # Orchestra/Ort: Just needs to be valid string (already passed validation above)
-                    # If it passed validation step 3, it's non-empty and > 3 chars
                     is_valid_auto = True
                     logging.info(f"Auto-accepting {category}: '{val_to_use}'")
 
                 if is_valid_auto:
-                    authorized = True
+                    # Update Map with new valid entity
+                    if category in ['dirigent', 'komponist', 'solist']:
+                         self.update_map(value, self.split_name(val_to_use))
+                    else:
+                         self.update_map(value, (val_to_use, ""))
+                    in_map = True
 
-                # If still not authorized, ask interactively
                 elif self.interactive:
-                    print(f"\n❓ Entity '{val_to_use}' ({category}) not found in DB or Map.")
-                    choice = input("(c)reate, (s)kip, (e)dit? ").strip().lower()
+                    print(f"\n❓ Entity '{val_to_use}' ({category}) not found/valid.")
+                    choice = input("(c)reate anyway, (s)kip, (e)dit? ").strip().lower()
 
                     if choice == 's':
-                        logging.info(f"Skipped unknown '{val_to_use}'")
+                        logging.error(f"❌ Error: Unknown '{val_to_use}' skipped by user.")
                         return None
                     elif choice == 'e':
                         new_val = input("Enter new value: ").strip()
                         if new_val:
+                            # Update Map: Old -> New
+                            # Note: We loop back, so validation happens on new value
+                            # We can tentatively map it, but better to map it after validation?
+                            # Actually, if we loop back, `value` param is still old value.
+                            # `val_to_use` becomes `new_val`.
+                            # Next iteration: checks cache/validation for `new_val`.
+                            # If successful, we want `value` -> `new_val` in map.
                             val_to_use = new_val
-                            authorized = True
-                            continue # Restart loop
+
+                            # We need to ensure that when the loop succeeds next time, we record the map.
+                            # But we don't have a clean way to pass "pending map update" to next iter.
+                            # Let's just update the map here?
+                            # "Update Map: J.Smith -> John Smith".
+                            # If John Smith turns out to be invalid, we might have a bad map?
+                            # But if user enters it, we assume they want it.
+                            # Let's update `value` (the original key) to map to `val_to_use`.
+                            # But we don't know the split parts yet.
+                            # We can wait until insert?
+                            # Simplification: If user edits, we update map NOW with string value?
+                            # Or just continue and let the logic handle it?
+                            # If I set `value = val_to_use`? No, we lose original key.
+                            # I'll rely on `in_map = True`? No.
+
+                            # Hack: Update map at end of loop if success?
+                            # Let's just continue. We will need to detect that `val_to_use` != `value`.
+                            continue
                         else:
                             return None
                     elif choice == 'c':
-                         pass # Proceed
-                    else:
-                         pass # Default
+                         pass # Proceed to insert
                 else:
-                    # Non-interactive: Proceed (or skip? Defaulting to create/proceed as per original behavior)
-                    pass
+                    logging.error(f"❌ Error: Unknown '{val_to_use}' skipped (non-interactive).")
+                    return None
 
             # 6. Insert
             try:
                 final_params = params
-                if val_to_use != value:
-                    if category in ['dirigent', 'solist', 'komponist']:
-                        parts = self.split_name(val_to_use)
-                        if category == 'komponist':
-                            final_params = (*parts, "")
-                        else:
-                            final_params = parts
-                    elif category in ['orchester', 'ort']:
-                        final_params = (val_to_use,)
+
+                # If val_to_use changed from original value, ensure params match
+                # (Caller provided params based on original value usually, but caller is simplistic)
+                # Actually, caller params are based on `p` passed to `ensure_entity`.
+                # If `val_to_use` changed (via Map or Edit), we MUST regenerate params.
+
+                if category in ['dirigent', 'solist', 'komponist']:
+                    parts = self.split_name(val_to_use)
+                    if category == 'komponist':
+                        final_params = (*parts, "")
+                    else:
+                        final_params = parts
+                elif category in ['orchester', 'ort']:
+                    final_params = (val_to_use,)
 
                 self.new_cur.execute(insert_sql, final_params)
                 new_id = self.new_cur.lastrowid
@@ -487,6 +594,16 @@ class MigrationSpecialist:
                 self.cache[category][norm_key] = new_id
                 self.update_name_index(category, val_to_use, new_id)
                 logging.info(f"Created {category}: {val_to_use}")
+
+                # Final Catch-All Map Update:
+                # If we created it, and it wasn't in map (or we edited it), update map.
+                # Use `value` (original key) -> `val_to_use` (final name).
+                if value not in self.correction_map:
+                     if category in ['dirigent', 'komponist', 'solist']:
+                         self.update_map(value, self.split_name(val_to_use))
+                     else:
+                         self.update_map(value, (val_to_use, ""))
+
                 return new_id
             except Error as e:
                 logging.error(f"Failed to insert {category} '{val_to_use}': {e}")
@@ -961,5 +1078,8 @@ if __name__ == "__main__":
 
     if args.documents:
         spec.migrate_documents()
+
+    # Save updated correction map
+    spec.save_correction_map('correction-map-updated.json')
 
     spec.close()
