@@ -103,12 +103,12 @@ class MigrationSpecialist:
         parts = re.split(pattern, val, flags=re.IGNORECASE)
         return [p.strip() for p in parts if p.strip()]
 
-    def validate_and_fix_input(self, category, value):
+    def validate_and_fix_input(self, category, value, authorized=False):
         """
         Validates input based on rules:
         - Skip 'etc.', 'u.a.'
         - Min length 4 chars
-        - Person types must have First and Last Name
+        - Person types must have First and Last Name (UNLESS authorized)
         Returns cleaned value or None (if skipped).
         Handles interactive prompting.
         """
@@ -143,6 +143,10 @@ class MigrationSpecialist:
                 first, last = self.split_name(current_val)
 
                 if not first or not last:
+                    # If authorized (e.g. from Map), we allow single names (first="" or last="")
+                    if authorized:
+                        return current_val
+
                     msg = f"Value '{current_val}' is missing First or Last Name."
                     if self.interactive:
                         print(f"\n⚠️ {msg}")
@@ -276,7 +280,7 @@ class MigrationSpecialist:
             # 3. Validation
             # Returns cleaned value or None (if skipped).
             # If user edits here, val_to_use changes.
-            validated_val = self.validate_and_fix_input(category, val_to_use)
+            validated_val = self.validate_and_fix_input(category, val_to_use, authorized=authorized)
             if not validated_val:
                 return None # Skip
 

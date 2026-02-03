@@ -1,38 +1,26 @@
-2026-02-03 19:58:00,273 - INFO - Loading existing data from new database...
-2026-02-03 19:58:00,274 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,274 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,274 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,274 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,274 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,274 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,274 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 19:58:00,278 - INFO - Created komponist: Doe
-2026-02-03 19:58:00,278 - INFO - Loading existing data from new database...
-2026-02-03 19:58:00,278 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,278 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,279 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,279 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,279 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,279 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,279 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 19:58:00,281 - INFO - Created ort: Berlin
-2026-02-03 19:58:00,281 - INFO - Loading existing data from new database...
-2026-02-03 19:58:00,281 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,282 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,282 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,282 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,282 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,282 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,282 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 19:58:00,283 - INFO - Auto-accepting orchestra: 'Berlin Phil'
-2026-02-03 19:58:00,285 - INFO - Created orchester: Berlin Phil
-2026-02-03 19:58:00,285 - INFO - Loading existing data from new database...
-2026-02-03 19:58:00,285 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,285 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,285 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,285 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,286 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,286 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
-2026-02-03 19:58:00,286 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
-2026-02-03 19:58:00,287 - INFO - Auto-accepting valid person: 'John Doe'
-2026-02-03 19:58:00,288 - INFO - Created komponist: John Doe
+2026-02-03 20:05:55,124 - INFO - Loading existing data from new database...
+2026-02-03 20:05:55,125 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,125 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,125 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,125 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,125 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,125 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,125 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
+2026-02-03 20:05:55,126 - INFO - Loading existing data from new database...
+2026-02-03 20:05:55,126 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,127 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,127 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,127 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,127 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,127 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,127 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
+2026-02-03 20:05:55,130 - INFO - Created solist: ; Rammstein
+2026-02-03 20:05:55,130 - INFO - Loading existing data from new database...
+2026-02-03 20:05:55,130 - ERROR - Error loading Dirigenten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,130 - ERROR - Error loading Komponisten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,131 - ERROR - Error loading Solisten: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,131 - ERROR - Error loading Orchester: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,131 - ERROR - Error loading Orte: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,131 - ERROR - Error loading Werke: 'NoneType' object has no attribute 'execute'
+2026-02-03 20:05:55,131 - INFO - ✓ Korrektur-Map geladen (30 Einträge).
+2026-02-03 20:05:55,133 - INFO - Created solist: Rammstein
