@@ -348,13 +348,11 @@ class MigrationSpecialist:
                         is_valid_auto = True
                         logging.info(f"Auto-accepting valid person: '{val_to_use}'")
 
-                elif category == 'orchester':
-                    # Orchestra: Just needs to be valid string (already passed validation above)
+                elif category in ['orchester', 'ort']:
+                    # Orchestra/Ort: Just needs to be valid string (already passed validation above)
                     # If it passed validation step 3, it's non-empty and > 3 chars
                     is_valid_auto = True
-                    logging.info(f"Auto-accepting orchestra: '{val_to_use}'")
-
-                # Ort is EXCLUDED from auto-accept (per user request)
+                    logging.info(f"Auto-accepting {category}: '{val_to_use}'")
 
                 if is_valid_auto:
                     authorized = True
