@@ -103,12 +103,98 @@ class MigrationSpecialist:
         parts = re.split(pattern, val, flags=re.IGNORECASE)
         return [p.strip() for p in parts if p.strip()]
 
-    def validate_and_fix_input(self, category, value):
+    def parse_complex_entity_string(self, raw_val, category):
+        """
+        Parses a raw string (e.g. "Beethoven, Mozart u.a.") into valid entity names
+        using the correction map and splitting logic.
+        Returns a list of resolved names (mapped values).
+        Logs unknowns.
+        """
+        if not raw_val: return []
+
+        # 1. Clean
+        # Remove "u.a.", "u. a.", "etc."
+        clean_val = raw_val
+        for junk in ["u.a.", "u. a.", "etc."]:
+            clean_val = re.sub(re.escape(junk), "", clean_val, flags=re.IGNORECASE)
+
+        # 2. Split by comma and slash
+        primary_parts = re.split(r'[,/]', clean_val)
+
+        resolved_names = []
+
+        for segment in primary_parts:
+            seg = segment.strip()
+            if not seg: continue
+
+            # 3. Split by Space
+            parts = seg.split(' ')
+            parts = [p.strip() for p in parts if p.strip()]
+
+            if not parts: continue
+
+            # Check Longest Match / Combinations
+            # User requirement: "then the combination of parts will be tested"
+            # User example: "Ludwig van Beethoven" -> finds "Beethoven".
+            # This implies we check individual parts, but also potentially combinations?
+            # User said: "if there three parts you will find 'Beethoven'..."
+            # This strongly implies checking each part individually against the map.
+            # But what if the map has "Ludwig van Beethoven"?
+            # If we check only "Ludwig", "van", "Beethoven", we miss the full key.
+            # So we should try the Whole Segment first.
+
+            # Strategy:
+            # A. Check Whole Segment (e.g. "Ludwig van Beethoven")
+            if seg in self.correction_map:
+                resolved_names.append(self.correction_map[seg])
+                continue
+
+            # B. Check parts
+            # "Ludwig", "van", "Beethoven"
+            found_any_in_segment = False
+
+            for p in parts:
+                if p in self.correction_map:
+                    resolved_names.append(self.correction_map[p])
+                    found_any_in_segment = True
+                else:
+                    # Log unknown parts as requested
+                    # "if nothing is found, write to the log, I will add the info"
+                    # But we only log if it's TRULY unknown (not part of a bigger match we missed?)
+                    # Given the user instruction, we treat every space-split part as a candidate.
+                    # If "Ludwig" is not in map, we log it.
+                    logging.info(f"ℹ️ Info: Part '{p}' from '{seg}' not found in correction map.")
+
+            # If we didn't find ANY match in the segment via map,
+            # we might want to return the segment itself as a candidate for DB lookup?
+            # The prompt says: "when entry in correction table is found then the corrected value is used"
+            # It doesn't explicitly say "only use correction table".
+            # But "if nothing is found, write to the log".
+            # This implies strict reliance on Map for this parsing step?
+            # If I return nothing, `ensure_entity` won't be called.
+            # But maybe the user implies: If "Beethoven" is found, use it.
+            # If "Unknown" is not found, log it.
+            # Does "Unknown" get added?
+            # "if nothing is found... I will add the info" -> Implies manual fix later.
+            # So for now, we only yield matches?
+            # BUT: If I have a valid new composer "John Smith" (not in map),
+            # I want to add him!
+            # So we should probably treat the segment as a fallback if no parts matched?
+
+            if not found_any_in_segment:
+                # If no parts were mapped, we assume the whole segment is the name
+                # (e.g. "John Smith" - no map entry, but valid name).
+                # We add it to resolved list so ensure_entity can process it (DB lookup, Auto-Accept, etc.)
+                resolved_names.append(seg)
+
+        return resolved_names
+
+    def validate_and_fix_input(self, category, value, authorized=False):
         """
         Validates input based on rules:
         - Skip 'etc.', 'u.a.'
         - Min length 4 chars
-        - Person types must have First and Last Name
+        - Person types must have First and Last Name (UNLESS authorized)
         Returns cleaned value or None (if skipped).
         Handles interactive prompting.
         """
@@ -143,6 +229,10 @@ class MigrationSpecialist:
                 first, last = self.split_name(current_val)
 
                 if not first or not last:
+                    # If authorized (e.g. from Map), we allow single names (first="" or last="")
+                    if authorized:
+                        return current_val
+
                     msg = f"Value '{current_val}' is missing First or Last Name."
                     if self.interactive:
                         print(f"\n⚠️ {msg}")
@@ -257,113 +347,153 @@ class MigrationSpecialist:
         """
         if not value: return None
 
-        # 1. Apply Correction
-        val_to_use = self.correction_map.get(value, value)
-        norm_key = self.normalize_name(val_to_use)
+        # 1. Apply Correction Map (Priority 1)
+        # If in map, we trust the mapped value ("authorized").
+        val_to_use = value
+        authorized = False
 
-        # 2. Cache Lookup
-        if norm_key in self.cache[category]:
-            return self.cache[category][norm_key]
+        if value in self.correction_map:
+            val_to_use = self.correction_map[value]
+            authorized = True
 
-        # 3. Validation (NEW)
-        # Only validate if we are creating new (not in cache)
-        # Note: We validate val_to_use. If user edits in interactive validation, val_to_use changes.
-        validated_val = self.validate_and_fix_input(category, val_to_use)
-        if not validated_val:
-            return None # Skip
-
-        if validated_val != val_to_use:
-            val_to_use = validated_val
+        while True:
             norm_key = self.normalize_name(val_to_use)
-            # Re-check cache just in case user entered something existing
+
+            # 2. Cache Lookup (Priority 2: Complete Entry)
             if norm_key in self.cache[category]:
                 return self.cache[category][norm_key]
 
-        # 4. Name-Only Lookup (for Person categories)
-        if category in ['dirigent', 'komponist', 'solist']:
-            first, last = self.split_name(val_to_use)
-            if not first and last: # Name only provided (e.g. "Beethoven")
-                norm_last = self.normalize_name(last)
-                candidates = self.name_index[category].get(norm_last, [])
-                unique_ids = list({c[1] for c in candidates})
+            # 3. Validation
+            # Returns cleaned value or None (if skipped).
+            # If user edits here, val_to_use changes.
+            validated_val = self.validate_and_fix_input(category, val_to_use, authorized=authorized)
+            if not validated_val:
+                return None # Skip
 
-                if len(unique_ids) == 1:
-                    # Unique match found
-                    found_id = unique_ids[0]
-                    self.cache[category][norm_key] = found_id
-                    return found_id
+            if validated_val != val_to_use:
+                val_to_use = validated_val
+                authorized = True # User manually edited/accepted it
+                continue # Restart loop to check cache/map for new value
 
-                elif len(unique_ids) > 1:
-                    # Ambiguous
-                    if self.interactive:
-                        print(f"\n⚠️ Ambiguity for '{val_to_use}' ({category}):")
-                        options = []
-                        # Retrieve names for these IDs to show user
-                        for i, uid in enumerate(unique_ids):
-                            # We need to find the name in the index or query DB
-                            # candidates has (norm_full, id). Let's use norm_full or query DB?
-                            # DB query is safer for display.
-                            table = "Komponisten" if category == "komponist" else "Dirigenten" if category == "dirigent" else "Solisten"
-                            self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (uid,))
-                            res = self.new_cur.fetchone()
-                            name_display = f"{res[0]} {res[1]}" if res else f"ID {uid}"
-                            options.append((uid, name_display))
-                            print(f"   {i+1}: {name_display}")
+            # 4. Name-Only Lookup (for Person categories)
+            if category in ['dirigent', 'komponist', 'solist']:
+                first, last = self.split_name(val_to_use)
+                if not first and last: # Name only provided (e.g. "Beethoven")
+                    norm_last = self.normalize_name(last)
+                    candidates = self.name_index[category].get(norm_last, [])
+                    unique_ids = list({c[1] for c in candidates})
 
-                        print(f"   0: Create new '{val_to_use}'")
-                        print(f"   s: Skip")
+                    if len(unique_ids) == 1:
+                        # Unique match found
+                        found_id = unique_ids[0]
+                        self.cache[category][norm_key] = found_id
+                        return found_id
 
-                        choice = input("Select option: ").strip().lower()
-                        if choice == 's':
-                            logging.info(f"Skipped ambiguous '{val_to_use}'")
-                            return None
-                        elif choice == '0':
-                            pass # Proceed to insert
-                        elif choice.isdigit() and 1 <= int(choice) <= len(options):
-                            selected_id = options[int(choice)-1][0]
-                            self.cache[category][norm_key] = selected_id
-                            return selected_id
+                    elif len(unique_ids) > 1:
+                        # Ambiguous
+                        if self.interactive:
+                            print(f"\n⚠️ Ambiguity for '{val_to_use}' ({category}):")
+                            options = []
+                            for i, uid in enumerate(unique_ids):
+                                table = "Komponisten" if category == "komponist" else "Dirigenten" if category == "dirigent" else "Solisten"
+                                self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (uid,))
+                                res = self.new_cur.fetchone()
+                                name_display = f"{res[0]} {res[1]}" if res else f"ID {uid}"
+                                options.append((uid, name_display))
+                                print(f"   {i+1}: {name_display}")
+
+                            print(f"   0: Create new '{val_to_use}'")
+                            print(f"   s: Skip")
+
+                            choice = input("Select option: ").strip().lower()
+                            if choice == 's':
+                                logging.info(f"Skipped ambiguous '{val_to_use}'")
+                                return None
+                            elif choice == '0':
+                                authorized = True # Proceed
+                            elif choice.isdigit() and 1 <= int(choice) <= len(options):
+                                selected_id = options[int(choice)-1][0]
+                                self.cache[category][norm_key] = selected_id
+                                return selected_id
+                            else:
+                                logging.warning("Invalid choice. Creating new.")
+                                authorized = True
                         else:
-                             logging.warning("Invalid choice. Creating new.")
+                            logging.warning(f"Ambiguous '{val_to_use}' skipped in non-interactive mode. Candidates: {len(unique_ids)}")
+                            return None # Skip
+
+            # 5. Unknown Entity Check (Priority 3: Auto-Authorize Valid Entries or Ask)
+            if not authorized:
+                # Check for "Valid" entry to auto-authorize
+                is_valid_auto = False
+
+                if category in ['dirigent', 'komponist', 'solist']:
+                    # Person: Needs First + Last Name
+                    f, l = self.split_name(val_to_use)
+                    if f and l:
+                        is_valid_auto = True
+                        logging.info(f"Auto-accepting valid person: '{val_to_use}'")
+
+                elif category in ['orchester', 'ort']:
+                    # Orchestra/Ort: Just needs to be valid string (already passed validation above)
+                    # If it passed validation step 3, it's non-empty and > 3 chars
+                    is_valid_auto = True
+                    logging.info(f"Auto-accepting {category}: '{val_to_use}'")
+
+                if is_valid_auto:
+                    authorized = True
+
+                # If still not authorized, ask interactively
+                elif self.interactive:
+                    print(f"\n❓ Entity '{val_to_use}' ({category}) not found in DB or Map.")
+                    choice = input("(c)reate, (s)kip, (e)dit? ").strip().lower()
+
+                    if choice == 's':
+                        logging.info(f"Skipped unknown '{val_to_use}'")
+                        return None
+                    elif choice == 'e':
+                        new_val = input("Enter new value: ").strip()
+                        if new_val:
+                            val_to_use = new_val
+                            authorized = True
+                            continue # Restart loop
+                        else:
+                            return None
+                    elif choice == 'c':
+                         pass # Proceed
                     else:
-                        logging.warning(f"Ambiguous '{val_to_use}' skipped in non-interactive mode. Candidates: {len(unique_ids)}")
-                        return None # Skip
+                         pass # Default
+                else:
+                    # Non-interactive: Proceed (or skip? Defaulting to create/proceed as per original behavior)
+                    pass
 
-        # 4. Insert
-        try:
-            # Prepare params if not raw
-            final_params = params
-            # Logic from original script: handle splitting if passed raw string in params?
-            # The caller should pass correct params.
-            # But wait, original `get_or_create` modified params based on `val_to_use`.
-            # If `val_to_use` changed due to correction map, we need to update params.
-            if val_to_use != value:
-                 if category in ['dirigent', 'solist', 'komponist']:
-                    parts = self.split_name(val_to_use)
-                    if category == 'komponist':
-                        final_params = (*parts, "")
-                    else:
-                        final_params = parts
-                 elif category in ['orchester', 'ort']:
-                    final_params = (val_to_use,)
+            # 6. Insert
+            try:
+                final_params = params
+                if val_to_use != value:
+                    if category in ['dirigent', 'solist', 'komponist']:
+                        parts = self.split_name(val_to_use)
+                        if category == 'komponist':
+                            final_params = (*parts, "")
+                        else:
+                            final_params = parts
+                    elif category in ['orchester', 'ort']:
+                        final_params = (val_to_use,)
 
-            self.new_cur.execute(insert_sql, final_params)
-            new_id = self.new_cur.lastrowid
-            self.new_conn.commit() # Commit immediately? Or batch? Original did commit at end?
-            # Original: commit at end of transfer. But here we might run separately.
-            # Safer to commit if we want subsequent lookups to find it?
-            # Actually, insert gives us an ID. We cache it.
-            # If we crash, we lose it?
-            # Let's commit.
-            self.new_conn.commit()
+                self.new_cur.execute(insert_sql, final_params)
+                new_id = self.new_cur.lastrowid
+                self.new_conn.commit()
 
-            self.cache[category][norm_key] = new_id
-            self.update_name_index(category, val_to_use, new_id)
-            logging.info(f"Created {category}: {val_to_use}")
-            return new_id
-        except Error as e:
-            logging.error(f"Failed to insert {category} '{val_to_use}': {e}")
-            return None
+                self.cache[category][norm_key] = new_id
+                self.update_name_index(category, val_to_use, new_id)
+                logging.info(f"Created {category}: {val_to_use}")
+                return new_id
+            except Error as e:
+                logging.error(f"Failed to insert {category} '{val_to_use}': {e}")
+                return None
+
+            # Break the loop if we reached here
+            break
 
     def lookup_entity(self, category, value):
         """
@@ -407,13 +537,8 @@ class MigrationSpecialist:
         count = 0
         for row in self.old_cur.fetchall():
             val = row['Solist']
-            # Clean: remove 'u.a.'
-            val_clean = val.replace("u.a.", "").replace("u. a.", "").replace("etc.", "").strip()
-            if not val_clean: continue
-            
-            # Split by comma
-            parts = [s.strip() for s in val_clean.split(',') if s.strip()]
-            for p in parts:
+            resolved = self.parse_complex_entity_string(val, 'solist')
+            for p in resolved:
                 if self.ensure_entity('solist', p,
                     "INSERT INTO Solisten (Vorname, Name) VALUES (%s, %s)",
                     self.split_name(p)):
@@ -426,9 +551,8 @@ class MigrationSpecialist:
         count = 0
         for row in self.old_cur.fetchall():
             val = row['Komponist']
-            # Split
-            parts = self.split_komponist_string(val)
-            for p in parts:
+            resolved = self.parse_complex_entity_string(val, 'komponist')
+            for p in resolved:
                 if self.ensure_entity('komponist', p,
                     "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
                     (*self.split_name(p), "")):
@@ -441,10 +565,12 @@ class MigrationSpecialist:
         count = 0
         for row in self.old_cur.fetchall():
             val = row['Dirigent']
-            if self.ensure_entity('dirigent', val,
-                "INSERT INTO Dirigenten (Vorname, Name) VALUES (%s, %s)",
-                self.split_name(val)):
-                count += 1
+            resolved = self.parse_complex_entity_string(val, 'dirigent')
+            for p in resolved:
+                if self.ensure_entity('dirigent', p,
+                    "INSERT INTO Dirigenten (Vorname, Name) VALUES (%s, %s)",
+                    self.split_name(p)):
+                    count += 1
         logging.info(f"Conductor migration finished. Processed {count} entries.")
 
     def migrate_orchestras(self):
@@ -494,31 +620,17 @@ class MigrationSpecialist:
 
             # So we must try to match the Composer string to an existing Composer ID.
 
-            komp_parts = self.split_komponist_string(komp_str)
+            resolved_composers = self.parse_complex_entity_string(komp_str, 'komponist')
 
-            if not komp_parts:
+            if not resolved_composers:
                 logging.warning(f"Work '{werk_name}' has no composer. Skipped.")
                 skipped += 1
                 continue
 
-            # Logic:
-            # 1. If 1 composer part -> Look up composer ID. If found, ensure Work exists.
-            # 2. If >1 composer parts ->
-            #    Original script: Create "Todo" works.
-            #    New Logic:
-            #    - The AI analysis was done during RECORD transfer in original script.
-            #    - Here we are just adding Master Data (Works).
-            #    - Without the AI/Context (Bewertung), we can't easily split "Beethoven / Mozart" -> "Sym 5 / Sym 40".
-            #    - The user didn't ask for AI here, just "add those who are not found".
-            #    - Maybe we should just use the first composer for the named work, and Todo for others?
-            #    - Or try to find ALL composers?
+            # Simplification: Only handle the FIRST resolved composer for the named work.
+            # (Because we don't know which work belongs to which composer if there are multiple).
 
-            # Let's stick to: Try to find composer. If missing, LOG ERROR (as per "write a lot where entries could not be done").
-
-            # Simplification: Only handle the FIRST composer for the named work.
-            # (Because we don't know which work belongs to which composer if there are multiple, without AI/Context).
-
-            first_komp_str = komp_parts[0]
+            first_komp_str = resolved_composers[0]
             k_id = self.lookup_entity('komponist', first_komp_str)
 
             if not k_id:
