@@ -28,5 +28,8 @@
     "Wanhal":"Johann Baptist; Vanhal",
     "Vanhal":"Johann Baptist; Vanhal",
     "Haydn":"Joseph; Haydn",
-    "Schubert":"Franz; Schubert"
+    "Schubert":"Franz; Schubert",
+    "Kreuzchor" : "; Kreuzchor",
+    "Staatsopernchor" : "; Staatsopernchor",
+    "Rammstein" : "; Rammstein",
 }
