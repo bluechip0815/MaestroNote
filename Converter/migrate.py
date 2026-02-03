@@ -257,113 +257,133 @@ class MigrationSpecialist:
         """
         if not value: return None
 
-        # 1. Apply Correction
-        val_to_use = self.correction_map.get(value, value)
-        norm_key = self.normalize_name(val_to_use)
+        # 1. Apply Correction Map (Priority 1)
+        # If in map, we trust the mapped value ("authorized").
+        val_to_use = value
+        authorized = False
 
-        # 2. Cache Lookup
-        if norm_key in self.cache[category]:
-            return self.cache[category][norm_key]
+        if value in self.correction_map:
+            val_to_use = self.correction_map[value]
+            authorized = True
 
-        # 3. Validation (NEW)
-        # Only validate if we are creating new (not in cache)
-        # Note: We validate val_to_use. If user edits in interactive validation, val_to_use changes.
-        validated_val = self.validate_and_fix_input(category, val_to_use)
-        if not validated_val:
-            return None # Skip
-
-        if validated_val != val_to_use:
-            val_to_use = validated_val
+        while True:
             norm_key = self.normalize_name(val_to_use)
-            # Re-check cache just in case user entered something existing
+
+            # 2. Cache Lookup (Priority 2: Complete Entry)
             if norm_key in self.cache[category]:
                 return self.cache[category][norm_key]
 
-        # 4. Name-Only Lookup (for Person categories)
-        if category in ['dirigent', 'komponist', 'solist']:
-            first, last = self.split_name(val_to_use)
-            if not first and last: # Name only provided (e.g. "Beethoven")
-                norm_last = self.normalize_name(last)
-                candidates = self.name_index[category].get(norm_last, [])
-                unique_ids = list({c[1] for c in candidates})
+            # 3. Validation
+            # Returns cleaned value or None (if skipped).
+            # If user edits here, val_to_use changes.
+            validated_val = self.validate_and_fix_input(category, val_to_use)
+            if not validated_val:
+                return None # Skip
 
-                if len(unique_ids) == 1:
-                    # Unique match found
-                    found_id = unique_ids[0]
-                    self.cache[category][norm_key] = found_id
-                    return found_id
+            if validated_val != val_to_use:
+                val_to_use = validated_val
+                authorized = True # User manually edited/accepted it
+                continue # Restart loop to check cache/map for new value
 
-                elif len(unique_ids) > 1:
-                    # Ambiguous
-                    if self.interactive:
-                        print(f"\n⚠️ Ambiguity for '{val_to_use}' ({category}):")
-                        options = []
-                        # Retrieve names for these IDs to show user
-                        for i, uid in enumerate(unique_ids):
-                            # We need to find the name in the index or query DB
-                            # candidates has (norm_full, id). Let's use norm_full or query DB?
-                            # DB query is safer for display.
-                            table = "Komponisten" if category == "komponist" else "Dirigenten" if category == "dirigent" else "Solisten"
-                            self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (uid,))
-                            res = self.new_cur.fetchone()
-                            name_display = f"{res[0]} {res[1]}" if res else f"ID {uid}"
-                            options.append((uid, name_display))
-                            print(f"   {i+1}: {name_display}")
+            # 4. Name-Only Lookup (for Person categories)
+            if category in ['dirigent', 'komponist', 'solist']:
+                first, last = self.split_name(val_to_use)
+                if not first and last: # Name only provided (e.g. "Beethoven")
+                    norm_last = self.normalize_name(last)
+                    candidates = self.name_index[category].get(norm_last, [])
+                    unique_ids = list({c[1] for c in candidates})
 
-                        print(f"   0: Create new '{val_to_use}'")
-                        print(f"   s: Skip")
+                    if len(unique_ids) == 1:
+                        # Unique match found
+                        found_id = unique_ids[0]
+                        self.cache[category][norm_key] = found_id
+                        return found_id
 
-                        choice = input("Select option: ").strip().lower()
-                        if choice == 's':
-                            logging.info(f"Skipped ambiguous '{val_to_use}'")
-                            return None
-                        elif choice == '0':
-                            pass # Proceed to insert
-                        elif choice.isdigit() and 1 <= int(choice) <= len(options):
-                            selected_id = options[int(choice)-1][0]
-                            self.cache[category][norm_key] = selected_id
-                            return selected_id
+                    elif len(unique_ids) > 1:
+                        # Ambiguous
+                        if self.interactive:
+                            print(f"\n⚠️ Ambiguity for '{val_to_use}' ({category}):")
+                            options = []
+                            for i, uid in enumerate(unique_ids):
+                                table = "Komponisten" if category == "komponist" else "Dirigenten" if category == "dirigent" else "Solisten"
+                                self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (uid,))
+                                res = self.new_cur.fetchone()
+                                name_display = f"{res[0]} {res[1]}" if res else f"ID {uid}"
+                                options.append((uid, name_display))
+                                print(f"   {i+1}: {name_display}")
+
+                            print(f"   0: Create new '{val_to_use}'")
+                            print(f"   s: Skip")
+
+                            choice = input("Select option: ").strip().lower()
+                            if choice == 's':
+                                logging.info(f"Skipped ambiguous '{val_to_use}'")
+                                return None
+                            elif choice == '0':
+                                authorized = True # Proceed
+                            elif choice.isdigit() and 1 <= int(choice) <= len(options):
+                                selected_id = options[int(choice)-1][0]
+                                self.cache[category][norm_key] = selected_id
+                                return selected_id
+                            else:
+                                logging.warning("Invalid choice. Creating new.")
+                                authorized = True
                         else:
-                             logging.warning("Invalid choice. Creating new.")
+                            logging.warning(f"Ambiguous '{val_to_use}' skipped in non-interactive mode. Candidates: {len(unique_ids)}")
+                            return None # Skip
+
+            # 5. Unknown Entity Check (Priority 3: Interactive Ask)
+            if not authorized:
+                if self.interactive:
+                    print(f"\n❓ Entity '{val_to_use}' ({category}) not found in DB or Map.")
+                    choice = input("(c)reate, (s)kip, (e)dit? ").strip().lower()
+
+                    if choice == 's':
+                        logging.info(f"Skipped unknown '{val_to_use}'")
+                        return None
+                    elif choice == 'e':
+                        new_val = input("Enter new value: ").strip()
+                        if new_val:
+                            val_to_use = new_val
+                            authorized = True
+                            continue # Restart loop
+                        else:
+                            return None
+                    elif choice == 'c':
+                         pass # Proceed
                     else:
-                        logging.warning(f"Ambiguous '{val_to_use}' skipped in non-interactive mode. Candidates: {len(unique_ids)}")
-                        return None # Skip
+                         pass # Default
+                else:
+                    # Non-interactive: Proceed (or skip? Defaulting to create/proceed as per original behavior)
+                    pass
 
-        # 4. Insert
-        try:
-            # Prepare params if not raw
-            final_params = params
-            # Logic from original script: handle splitting if passed raw string in params?
-            # The caller should pass correct params.
-            # But wait, original `get_or_create` modified params based on `val_to_use`.
-            # If `val_to_use` changed due to correction map, we need to update params.
-            if val_to_use != value:
-                 if category in ['dirigent', 'solist', 'komponist']:
-                    parts = self.split_name(val_to_use)
-                    if category == 'komponist':
-                        final_params = (*parts, "")
-                    else:
-                        final_params = parts
-                 elif category in ['orchester', 'ort']:
-                    final_params = (val_to_use,)
+            # 6. Insert
+            try:
+                final_params = params
+                if val_to_use != value:
+                    if category in ['dirigent', 'solist', 'komponist']:
+                        parts = self.split_name(val_to_use)
+                        if category == 'komponist':
+                            final_params = (*parts, "")
+                        else:
+                            final_params = parts
+                    elif category in ['orchester', 'ort']:
+                        final_params = (val_to_use,)
 
-            self.new_cur.execute(insert_sql, final_params)
-            new_id = self.new_cur.lastrowid
-            self.new_conn.commit() # Commit immediately? Or batch? Original did commit at end?
-            # Original: commit at end of transfer. But here we might run separately.
-            # Safer to commit if we want subsequent lookups to find it?
-            # Actually, insert gives us an ID. We cache it.
-            # If we crash, we lose it?
-            # Let's commit.
-            self.new_conn.commit()
+                self.new_cur.execute(insert_sql, final_params)
+                new_id = self.new_cur.lastrowid
+                self.new_conn.commit()
 
-            self.cache[category][norm_key] = new_id
-            self.update_name_index(category, val_to_use, new_id)
-            logging.info(f"Created {category}: {val_to_use}")
-            return new_id
-        except Error as e:
-            logging.error(f"Failed to insert {category} '{val_to_use}': {e}")
-            return None
+                self.cache[category][norm_key] = new_id
+                self.update_name_index(category, val_to_use, new_id)
+                logging.info(f"Created {category}: {val_to_use}")
+                return new_id
+            except Error as e:
+                logging.error(f"Failed to insert {category} '{val_to_use}': {e}")
+                return None
+
+            # Break the loop if we reached here
+            break
 
     def lookup_entity(self, category, value):
         """
