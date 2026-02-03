@@ -103,6 +103,92 @@ class MigrationSpecialist:
         parts = re.split(pattern, val, flags=re.IGNORECASE)
         return [p.strip() for p in parts if p.strip()]
 
+    def parse_complex_entity_string(self, raw_val, category):
+        """
+        Parses a raw string (e.g. "Beethoven, Mozart u.a.") into valid entity names
+        using the correction map and splitting logic.
+        Returns a list of resolved names (mapped values).
+        Logs unknowns.
+        """
+        if not raw_val: return []
+
+        # 1. Clean
+        # Remove "u.a.", "u. a.", "etc."
+        clean_val = raw_val
+        for junk in ["u.a.", "u. a.", "etc."]:
+            clean_val = re.sub(re.escape(junk), "", clean_val, flags=re.IGNORECASE)
+
+        # 2. Split by comma and slash
+        primary_parts = re.split(r'[,/]', clean_val)
+
+        resolved_names = []
+
+        for segment in primary_parts:
+            seg = segment.strip()
+            if not seg: continue
+
+            # 3. Split by Space
+            parts = seg.split(' ')
+            parts = [p.strip() for p in parts if p.strip()]
+
+            if not parts: continue
+
+            # Check Longest Match / Combinations
+            # User requirement: "then the combination of parts will be tested"
+            # User example: "Ludwig van Beethoven" -> finds "Beethoven".
+            # This implies we check individual parts, but also potentially combinations?
+            # User said: "if there three parts you will find 'Beethoven'..."
+            # This strongly implies checking each part individually against the map.
+            # But what if the map has "Ludwig van Beethoven"?
+            # If we check only "Ludwig", "van", "Beethoven", we miss the full key.
+            # So we should try the Whole Segment first.
+
+            # Strategy:
+            # A. Check Whole Segment (e.g. "Ludwig van Beethoven")
+            if seg in self.correction_map:
+                resolved_names.append(self.correction_map[seg])
+                continue
+
+            # B. Check parts
+            # "Ludwig", "van", "Beethoven"
+            found_any_in_segment = False
+
+            for p in parts:
+                if p in self.correction_map:
+                    resolved_names.append(self.correction_map[p])
+                    found_any_in_segment = True
+                else:
+                    # Log unknown parts as requested
+                    # "if nothing is found, write to the log, I will add the info"
+                    # But we only log if it's TRULY unknown (not part of a bigger match we missed?)
+                    # Given the user instruction, we treat every space-split part as a candidate.
+                    # If "Ludwig" is not in map, we log it.
+                    logging.info(f"ℹ️ Info: Part '{p}' from '{seg}' not found in correction map.")
+
+            # If we didn't find ANY match in the segment via map,
+            # we might want to return the segment itself as a candidate for DB lookup?
+            # The prompt says: "when entry in correction table is found then the corrected value is used"
+            # It doesn't explicitly say "only use correction table".
+            # But "if nothing is found, write to the log".
+            # This implies strict reliance on Map for this parsing step?
+            # If I return nothing, `ensure_entity` won't be called.
+            # But maybe the user implies: If "Beethoven" is found, use it.
+            # If "Unknown" is not found, log it.
+            # Does "Unknown" get added?
+            # "if nothing is found... I will add the info" -> Implies manual fix later.
+            # So for now, we only yield matches?
+            # BUT: If I have a valid new composer "John Smith" (not in map),
+            # I want to add him!
+            # So we should probably treat the segment as a fallback if no parts matched?
+
+            if not found_any_in_segment:
+                # If no parts were mapped, we assume the whole segment is the name
+                # (e.g. "John Smith" - no map entry, but valid name).
+                # We add it to resolved list so ensure_entity can process it (DB lookup, Auto-Accept, etc.)
+                resolved_names.append(seg)
+
+        return resolved_names
+
     def validate_and_fix_input(self, category, value, authorized=False):
         """
         Validates input based on rules:
@@ -451,13 +537,8 @@ class MigrationSpecialist:
         count = 0
         for row in self.old_cur.fetchall():
             val = row['Solist']
-            # Clean: remove 'u.a.'
-            val_clean = val.replace("u.a.", "").replace("u. a.", "").replace("etc.", "").strip()
-            if not val_clean: continue
-            
-            # Split by comma
-            parts = [s.strip() for s in val_clean.split(',') if s.strip()]
-            for p in parts:
+            resolved = self.parse_complex_entity_string(val, 'solist')
+            for p in resolved:
                 if self.ensure_entity('solist', p,
                     "INSERT INTO Solisten (Vorname, Name) VALUES (%s, %s)",
                     self.split_name(p)):
@@ -470,9 +551,8 @@ class MigrationSpecialist:
         count = 0
         for row in self.old_cur.fetchall():
             val = row['Komponist']
-            # Split
-            parts = self.split_komponist_string(val)
-            for p in parts:
+            resolved = self.parse_complex_entity_string(val, 'komponist')
+            for p in resolved:
                 if self.ensure_entity('komponist', p,
                     "INSERT INTO Komponisten (Vorname, Name, Note) VALUES (%s, %s, %s)",
                     (*self.split_name(p), "")):
@@ -485,10 +565,12 @@ class MigrationSpecialist:
         count = 0
         for row in self.old_cur.fetchall():
             val = row['Dirigent']
-            if self.ensure_entity('dirigent', val,
-                "INSERT INTO Dirigenten (Vorname, Name) VALUES (%s, %s)",
-                self.split_name(val)):
-                count += 1
+            resolved = self.parse_complex_entity_string(val, 'dirigent')
+            for p in resolved:
+                if self.ensure_entity('dirigent', p,
+                    "INSERT INTO Dirigenten (Vorname, Name) VALUES (%s, %s)",
+                    self.split_name(p)):
+                    count += 1
         logging.info(f"Conductor migration finished. Processed {count} entries.")
 
     def migrate_orchestras(self):
@@ -538,31 +620,17 @@ class MigrationSpecialist:
 
             # So we must try to match the Composer string to an existing Composer ID.
 
-            komp_parts = self.split_komponist_string(komp_str)
+            resolved_composers = self.parse_complex_entity_string(komp_str, 'komponist')
 
-            if not komp_parts:
+            if not resolved_composers:
                 logging.warning(f"Work '{werk_name}' has no composer. Skipped.")
                 skipped += 1
                 continue
 
-            # Logic:
-            # 1. If 1 composer part -> Look up composer ID. If found, ensure Work exists.
-            # 2. If >1 composer parts ->
-            #    Original script: Create "Todo" works.
-            #    New Logic:
-            #    - The AI analysis was done during RECORD transfer in original script.
-            #    - Here we are just adding Master Data (Works).
-            #    - Without the AI/Context (Bewertung), we can't easily split "Beethoven / Mozart" -> "Sym 5 / Sym 40".
-            #    - The user didn't ask for AI here, just "add those who are not found".
-            #    - Maybe we should just use the first composer for the named work, and Todo for others?
-            #    - Or try to find ALL composers?
+            # Simplification: Only handle the FIRST resolved composer for the named work.
+            # (Because we don't know which work belongs to which composer if there are multiple).
 
-            # Let's stick to: Try to find composer. If missing, LOG ERROR (as per "write a lot where entries could not be done").
-
-            # Simplification: Only handle the FIRST composer for the named work.
-            # (Because we don't know which work belongs to which composer if there are multiple, without AI/Context).
-
-            first_komp_str = komp_parts[0]
+            first_komp_str = resolved_composers[0]
             k_id = self.lookup_entity('komponist', first_komp_str)
 
             if not k_id:
