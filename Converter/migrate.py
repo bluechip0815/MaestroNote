@@ -332,9 +332,31 @@ class MigrationSpecialist:
                             logging.warning(f"Ambiguous '{val_to_use}' skipped in non-interactive mode. Candidates: {len(unique_ids)}")
                             return None # Skip
 
-            # 5. Unknown Entity Check (Priority 3: Interactive Ask)
+            # 5. Unknown Entity Check (Priority 3: Auto-Authorize Valid Entries or Ask)
             if not authorized:
-                if self.interactive:
+                # Check for "Valid" entry to auto-authorize
+                is_valid_auto = False
+
+                if category in ['dirigent', 'komponist', 'solist']:
+                    # Person: Needs First + Last Name
+                    f, l = self.split_name(val_to_use)
+                    if f and l:
+                        is_valid_auto = True
+                        logging.info(f"Auto-accepting valid person: '{val_to_use}'")
+
+                elif category == 'orchester':
+                    # Orchestra: Just needs to be valid string (already passed validation above)
+                    # If it passed validation step 3, it's non-empty and > 3 chars
+                    is_valid_auto = True
+                    logging.info(f"Auto-accepting orchestra: '{val_to_use}'")
+
+                # Ort is EXCLUDED from auto-accept (per user request)
+
+                if is_valid_auto:
+                    authorized = True
+
+                # If still not authorized, ask interactively
+                elif self.interactive:
                     print(f"\n❓ Entity '{val_to_use}' ({category}) not found in DB or Map.")
                     choice = input("(c)reate, (s)kip, (e)dit? ").strip().lower()
 
