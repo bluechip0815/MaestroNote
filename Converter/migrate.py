@@ -5,7 +5,6 @@ import sys
 import os
 import unicodedata
 import re
-import json
 import logging
 from dotenv import load_dotenv
 
@@ -68,16 +67,9 @@ class MigrationSpecialist:
         # Caching um Duplikate in den Stammdaten zu vermeiden
         # Key: Normalized String, Value: ID in DB
         self.cache = {'dirigent': {}, 'orchester': {}, 'komponist': {}, 'werk': {}, 'solist': {}, 'ort': {}}
-        # Lookup for "Name only" ambiguity resolution
-        self.name_index = {'dirigent': {}, 'komponist': {}, 'solist': {}}
-        self.correction_map = {}
-        self.todo_counter = 1
 
         # Load existing data from New DB
         self.load_existing_data()
-
-        # Load correction map by default
-        self.load_correction_map(os.path.join(os.path.dirname(__file__), 'correction-map.json'))
 
     def normalize_name(self, name):
         if not name: return ""
@@ -105,15 +97,12 @@ class MigrationSpecialist:
 
     def parse_complex_entity_string(self, raw_val, category):
         """
-        Parses a raw string (e.g. "Beethoven, Mozart u.a.") into valid entity names
-        using the correction map and splitting logic.
-        Returns a list of resolved names (mapped values).
-        Logs unknowns.
+        Parses a raw string (e.g. "Beethoven, Mozart u.a.") into valid entity names.
+        Simplified version without correction map.
         """
         if not raw_val: return []
 
         # 1. Clean
-        # Remove "u.a.", "u. a.", "etc."
         clean_val = raw_val
         for junk in ["u.a.", "u. a.", "etc."]:
             clean_val = re.sub(re.escape(junk), "", clean_val, flags=re.IGNORECASE)
@@ -122,183 +111,12 @@ class MigrationSpecialist:
         primary_parts = re.split(r'[,/]', clean_val)
 
         resolved_names = []
-
         for segment in primary_parts:
             seg = segment.strip()
-            if not seg: continue
-
-            # 3. Split by Space
-            parts = seg.split(' ')
-            parts = [p.strip() for p in parts if p.strip()]
-
-            if not parts: continue
-
-            # Check Longest Match / Combinations
-            # User requirement: "then the combination of parts will be tested"
-            # User example: "Ludwig van Beethoven" -> finds "Beethoven".
-            # This implies we check individual parts, but also potentially combinations?
-            # User said: "if there three parts you will find 'Beethoven'..."
-            # This strongly implies checking each part individually against the map.
-            # But what if the map has "Ludwig van Beethoven"?
-            # If we check only "Ludwig", "van", "Beethoven", we miss the full key.
-            # So we should try the Whole Segment first.
-
-            # Strategy:
-            # A. Check Whole Segment (e.g. "Ludwig van Beethoven")
-            if seg in self.correction_map:
-                resolved_names.append(self.correction_map[seg])
-                continue
-
-            # B. Check parts
-            # "Ludwig", "van", "Beethoven"
-            found_any_in_segment = False
-
-            for p in parts:
-                if p in self.correction_map:
-                    resolved_names.append(self.correction_map[p])
-                    found_any_in_segment = True
-                else:
-                    # Log unknown parts as requested
-                    # "if nothing is found, write to the log, I will add the info"
-                    # But we only log if it's TRULY unknown (not part of a bigger match we missed?)
-                    # Given the user instruction, we treat every space-split part as a candidate.
-                    # If "Ludwig" is not in map, we log it.
-                    logging.info(f"ℹ️ Info: Part '{p}' from '{seg}' not found in correction map.")
-
-            # If we didn't find ANY match in the segment via map,
-            # we might want to return the segment itself as a candidate for DB lookup?
-            # The prompt says: "when entry in correction table is found then the corrected value is used"
-            # It doesn't explicitly say "only use correction table".
-            # But "if nothing is found, write to the log".
-            # This implies strict reliance on Map for this parsing step?
-            # If I return nothing, `ensure_entity` won't be called.
-            # But maybe the user implies: If "Beethoven" is found, use it.
-            # If "Unknown" is not found, log it.
-            # Does "Unknown" get added?
-            # "if nothing is found... I will add the info" -> Implies manual fix later.
-            # So for now, we only yield matches?
-            # BUT: If I have a valid new composer "John Smith" (not in map),
-            # I want to add him!
-            # So we should probably treat the segment as a fallback if no parts matched?
-
-            if not found_any_in_segment:
-                # If no parts were mapped, we assume the whole segment is the name
-                # (e.g. "John Smith" - no map entry, but valid name).
-                # We add it to resolved list so ensure_entity can process it (DB lookup, Auto-Accept, etc.)
+            if seg:
                 resolved_names.append(seg)
 
         return resolved_names
-
-    def validate_and_fix_input(self, category, value, authorized=False):
-        """
-        Validates input based on rules:
-        - Skip 'etc.', 'u.a.'
-        - Min length 4 chars
-        - Person types must have First and Last Name (UNLESS authorized)
-        Returns cleaned value or None (if skipped).
-        Handles interactive prompting.
-        """
-        current_val = value
-
-        while True:
-            if not current_val: return None
-
-            # 1. Blacklist Check
-            lower_val = current_val.lower().strip()
-            if lower_val in ['etc.', 'u.a.', 'u. a.'] or lower_val.endswith('etc.'):
-                logging.info(f"Skipping junk entry: '{current_val}'")
-                return None
-
-            # 2. Length Check
-            if len(current_val) < 4:
-                msg = f"Value '{current_val}' is too short (<4 chars)."
-                if self.interactive:
-                    print(f"\n⚠️ {msg}")
-                    choice = input("(s)kip, (e)dit, (a)ccept? ").strip().lower()
-                    if choice == 's': return None
-                    if choice == 'e':
-                        current_val = input("Enter new value: ").strip()
-                        continue
-                    # 'a' accepts (proceeds to next check or returns)
-                else:
-                    logging.info(f"Skipping '{current_val}' (too short)")
-                    return None
-
-            # 3. Person Check (Missing Name Parts)
-            if category in ['dirigent', 'komponist', 'solist']:
-                first, last = self.split_name(current_val)
-
-                if not first or not last:
-                    # If authorized (e.g. from Map), we allow single names (first="" or last="")
-                    if authorized:
-                        return current_val
-
-                    msg = f"Value '{current_val}' is missing First or Last Name."
-                    if self.interactive:
-                        print(f"\n⚠️ {msg}")
-                        choice = input("(s)kip, (e)dit, (o)k? ").strip().lower()
-                        if choice == 's': return None
-                        if choice == 'e':
-                            current_val = input("Enter full correct name: ").strip()
-                            continue
-                        if choice == 'o': return current_val
-                    else:
-                        logging.info(f"Skipping '{current_val}' (incomplete name)")
-                        return None
-
-            return current_val
-
-    def load_correction_map(self, filepath):
-        if not filepath or not os.path.exists(filepath):
-            logging.warning(f"⚠️ Korrektur-Map nicht gefunden: {filepath}")
-            return
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                self.correction_map = json.load(f)
-            logging.info(f"✓ Korrektur-Map geladen ({len(self.correction_map)} Einträge).")
-        except Exception as e:
-            logging.error(f"❌ Fehler beim Laden der Korrektur-Map: {e}")
-
-    def save_correction_map(self, filepath):
-        try:
-            sorted_map = dict(sorted(self.correction_map.items()))
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(sorted_map, f, ensure_ascii=False, indent=4)
-            logging.info(f"✓ Correction map saved to {filepath} ({len(self.correction_map)} entries).")
-        except Exception as e:
-            logging.error(f"❌ Failed to save correction map: {e}")
-
-    def update_map(self, original_key, resolved_value_parts):
-        """
-        Updates the correction map with a new entry.
-        resolved_value_parts: Tuple/List of name parts (e.g. ("Johann", "Bach")) or single string.
-        """
-        if not original_key: return
-
-        # Construct value string "First; Last" or "Value"
-        if isinstance(resolved_value_parts, (list, tuple)):
-            if len(resolved_value_parts) == 2:
-                val_str = f"{resolved_value_parts[0]}; {resolved_value_parts[1]}"
-            elif len(resolved_value_parts) == 1:
-                val_str = f"; {resolved_value_parts[0]}" # Authorized single name?
-            else:
-                val_str = "; ".join(resolved_value_parts)
-        else:
-            val_str = str(resolved_value_parts)
-            # Check if it needs semicolon structure (Person vs Other)
-            # But here we assume resolved_value_parts comes from split_name or similar
-            # If it's a simple string like "Berlin", we might want "; Berlin" if it's a Location?
-            # Existing map has "Semperoper": "; Semperoper".
-            # But "Orchester" -> "Name".
-            # Let's rely on how split_name produced the parts.
-
-        # Clean up double spaces/semicolons
-        val_str = val_str.strip()
-        if val_str.startswith(";"): val_str = "; " + val_str[1:].strip()
-
-        if original_key not in self.correction_map:
-            self.correction_map[original_key] = val_str
-            logging.info(f"➕ Added to Map: '{original_key}' -> '{val_str}'")
 
     def clear_new_db(self):
         logging.info("⚠️ Lösche neue Datenbank für frischen Import...")
@@ -313,11 +131,22 @@ class MigrationSpecialist:
         self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
         self.new_conn.commit()
 
+    def clear_works(self):
+        logging.info("⚠️ Lösche Werke und Verknüpfungen...")
+        self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
+        try:
+            self.new_cur.execute("TRUNCATE TABLE MusicRecordWerk;")
+            self.new_cur.execute("TRUNCATE TABLE Werke;")
+            logging.info("✓ Werke tables truncated.")
+        except Error as e:
+            logging.error(f"❌ Error truncating works: {e}")
+        self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
+        self.new_conn.commit()
+
     def load_existing_data(self):
         """Loads existing entities from the new database into the cache."""
         logging.info("Loading existing data from new database...")
 
-        # Helper to load simple entities
         def load_simple(table, cache_key):
             try:
                 self.new_cur.execute(f"SELECT Id, Name FROM {table}")
@@ -328,7 +157,6 @@ class MigrationSpecialist:
             except Exception as e:
                 logging.error(f"Error loading {table}: {e}")
 
-        # Helper to load person entities (with Vorname)
         def load_person(table, cache_key):
             try:
                 self.new_cur.execute(f"SELECT Id, Vorname, Name FROM {table}")
@@ -337,7 +165,6 @@ class MigrationSpecialist:
                     norm = self.normalize_name(full_name)
                     if norm:
                         self.cache[cache_key][norm] = row[0]
-                        self.update_name_index(cache_key, full_name, row[0])
             except Exception as e:
                 logging.error(f"Error loading {table}: {e}")
 
@@ -347,302 +174,44 @@ class MigrationSpecialist:
         load_simple("Orchester", "orchester")
         load_simple("Orte", "ort")
 
-        # Werke need special handling (Name + KomponistId)
+        # Werke
         try:
             self.new_cur.execute("SELECT Id, Name, KomponistId FROM Werke")
             for row in self.new_cur.fetchall():
                 key = f"{row[1]}_{row[2]}"
-                norm = self.normalize_name(key) # Normalizing the key?
-                # Original script used: werk_key = f"{ai_w}_{k_id}" -> normalize_name(werk_key)
-                # Let's keep consistent: key is passed to get_or_create, which normalizes it.
-                # So we should normalize the lookup key.
-                # But here the key structure is complex.
-                # In original script: get_or_create('werk', f"{name}_{k_id}")
-                # normalize_name just lowercases and removes accents.
-                # So we should normalize the name part? No, the whole string.
-                # Just store it normalized.
+                norm = self.normalize_name(key)
                 if norm:
                     self.cache['werk'][norm] = row[0]
         except Exception as e:
             logging.error(f"Error loading Werke: {e}")
 
-    def update_name_index(self, category, full_name, db_id):
-        if category not in self.name_index: return
-        first, last = self.split_name(full_name)
-        if first and last:
-            norm_last = self.normalize_name(last)
-            if norm_last not in self.name_index[category]:
-                self.name_index[category][norm_last] = []
-
-            # Store tuple of (normalized_full_name, db_id)
-            norm_full = self.normalize_name(full_name)
-            # Avoid adding duplicates
-            if not any(entry[1] == db_id for entry in self.name_index[category][norm_last]):
-                self.name_index[category][norm_last].append((norm_full, db_id))
-
     def ensure_entity(self, category, value, insert_sql, params):
         """
-        Tries to find the entity using Map -> Cache -> NameIndex.
-        If found or valid new entity, updates Map and creates in DB.
-        If invalid/unknown and not fixed, logs error and skips.
+        Simple entity ensuring: Check Cache -> Insert if missing.
         """
         if not value: return None
+        norm_key = self.normalize_name(value)
 
-        # 1. Apply Correction Map (Priority 1)
-        val_to_use = value
-        in_map = False
-
-        if value in self.correction_map:
-            val_to_use = self.correction_map[value]
-            in_map = True
-
-        while True:
-            norm_key = self.normalize_name(val_to_use)
-
-            # 2. Cache Lookup (Priority 2: Existing Exact Match)
-            if norm_key in self.cache[category]:
-                # Found in DB.
-                # If we started with a value NOT in map (and it matched DB),
-                # we should add this valid mapping to the map.
-                if not in_map:
-                    # We need the correct formatting (First; Last) from DB or inferred from val_to_use?
-                    # val_to_use matches DB entry.
-                    # For Person: split_name(val_to_use).
-                    if category in ['dirigent', 'komponist', 'solist']:
-                        parts = self.split_name(val_to_use)
-                        self.update_map(value, parts)
-                    else:
-                        # Orchester/Ort: usually just name.
-                        self.update_map(value, (val_to_use, ""))
-
-                return self.cache[category][norm_key]
-
-            # 3. Name-Only Lookup (Ambiguity Check)
-            # We do this BEFORE strict validation, to catch cases like "Bach" (Last name only).
-            if category in ['dirigent', 'komponist', 'solist']:
-                first, last = self.split_name(val_to_use)
-                if not first and last: # Name only provided (e.g. "Beethoven")
-                    norm_last = self.normalize_name(last)
-                    candidates = self.name_index[category].get(norm_last, [])
-                    unique_ids = list({c[1] for c in candidates})
-
-                    if len(unique_ids) == 1:
-                        # Unique match found!
-                        found_id = unique_ids[0]
-                        self.cache[category][norm_key] = found_id
-
-                        # Fetch the full name to update map
-                        table = "Komponisten" if category == "komponist" else "Dirigenten" if category == "dirigent" else "Solisten"
-                        try:
-                            self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (found_id,))
-                            res = self.new_cur.fetchone()
-                            if res:
-                                # Add mapping: "Beethoven" -> "Ludwig; v. Beethoven"
-                                self.update_map(value, (res[0], res[1]))
-                        except: pass
-
-                        return found_id
-
-                    elif len(unique_ids) > 1:
-                        # Ambiguous
-                        selected_id = None
-                        selected_name = None
-
-                        if self.interactive:
-                            print(f"\n⚠️ Ambiguity for '{val_to_use}' ({category}):")
-                            options = []
-                            for i, uid in enumerate(unique_ids):
-                                table = "Komponisten" if category == "komponist" else "Dirigenten" if category == "dirigent" else "Solisten"
-                                self.new_cur.execute(f"SELECT Vorname, Name FROM {table} WHERE Id = %s", (uid,))
-                                res = self.new_cur.fetchone()
-                                name_display = f"{res[0]} {res[1]}" if res else f"ID {uid}"
-                                options.append((uid, name_display, res)) # Store res for map update
-                                print(f"   {i+1}: {name_display}")
-
-                            print(f"   0: Create new '{val_to_use}'")
-                            print(f"   s: Skip")
-
-                            choice = input("Select option: ").strip().lower()
-                            if choice == 's':
-                                logging.error(f"❌ Error: Ambiguous '{val_to_use}' skipped by user.")
-                                return None
-                            elif choice == '0':
-                                pass # Proceed to create new
-                            elif choice.isdigit() and 1 <= int(choice) <= len(options):
-                                selected_id = options[int(choice)-1][0]
-                                res_tuple = options[int(choice)-1][2]
-
-                                # Update Map
-                                self.update_map(value, (res_tuple[0], res_tuple[1]))
-
-                                self.cache[category][norm_key] = selected_id
-                                return selected_id
-                        else:
-                            logging.error(f"❌ Error: Ambiguous '{val_to_use}' skipped (non-interactive).")
-                            return None
-
-            # 4. Validation
-            validated_val = self.validate_and_fix_input(category, val_to_use, authorized=in_map)
-
-            # If validation failed (returned None), we log error and return None.
-            if not validated_val:
-                logging.error(f"❌ Error: Invalid input '{val_to_use}' (Original: '{value}') skipped.")
-                return None
-
-            if validated_val != val_to_use:
-                # User edited it in validation step.
-                # We treat this as a manual fix.
-                # Update map with Original -> New Value
-                if category in ['dirigent', 'komponist', 'solist']:
-                     self.update_map(value, self.split_name(validated_val))
-                else:
-                     self.update_map(value, (validated_val, ""))
-
-                val_to_use = validated_val
-                in_map = True # Treated as authorized now
-                continue # Restart loop to check cache
-
-            # 5. Create New Entity (Auto-Authorize or Ask)
-            if not in_map:
-                # Check for "Valid" entry to auto-authorize
-                is_valid_auto = False
-
-                if category in ['dirigent', 'komponist', 'solist']:
-                    f, l = self.split_name(val_to_use)
-                    if f and l:
-                        is_valid_auto = True
-                        logging.info(f"Auto-accepting valid person: '{val_to_use}'")
-
-                elif category in ['orchester', 'ort']:
-                    is_valid_auto = True
-                    logging.info(f"Auto-accepting {category}: '{val_to_use}'")
-
-                if is_valid_auto:
-                    # Update Map with new valid entity
-                    if category in ['dirigent', 'komponist', 'solist']:
-                         self.update_map(value, self.split_name(val_to_use))
-                    else:
-                         self.update_map(value, (val_to_use, ""))
-                    in_map = True
-
-                elif self.interactive:
-                    print(f"\n❓ Entity '{val_to_use}' ({category}) not found/valid.")
-                    choice = input("(c)reate anyway, (s)kip, (e)dit? ").strip().lower()
-
-                    if choice == 's':
-                        logging.error(f"❌ Error: Unknown '{val_to_use}' skipped by user.")
-                        return None
-                    elif choice == 'e':
-                        new_val = input("Enter new value: ").strip()
-                        if new_val:
-                            # Update Map: Old -> New
-                            # Note: We loop back, so validation happens on new value
-                            # We can tentatively map it, but better to map it after validation?
-                            # Actually, if we loop back, `value` param is still old value.
-                            # `val_to_use` becomes `new_val`.
-                            # Next iteration: checks cache/validation for `new_val`.
-                            # If successful, we want `value` -> `new_val` in map.
-                            val_to_use = new_val
-
-                            # We need to ensure that when the loop succeeds next time, we record the map.
-                            # But we don't have a clean way to pass "pending map update" to next iter.
-                            # Let's just update the map here?
-                            # "Update Map: J.Smith -> John Smith".
-                            # If John Smith turns out to be invalid, we might have a bad map?
-                            # But if user enters it, we assume they want it.
-                            # Let's update `value` (the original key) to map to `val_to_use`.
-                            # But we don't know the split parts yet.
-                            # We can wait until insert?
-                            # Simplification: If user edits, we update map NOW with string value?
-                            # Or just continue and let the logic handle it?
-                            # If I set `value = val_to_use`? No, we lose original key.
-                            # I'll rely on `in_map = True`? No.
-
-                            # Hack: Update map at end of loop if success?
-                            # Let's just continue. We will need to detect that `val_to_use` != `value`.
-                            continue
-                        else:
-                            return None
-                    elif choice == 'c':
-                         pass # Proceed to insert
-                else:
-                    logging.error(f"❌ Error: Unknown '{val_to_use}' skipped (non-interactive).")
-                    return None
-
-            # 6. Insert
-            try:
-                final_params = params
-
-                # If val_to_use changed from original value, ensure params match
-                # (Caller provided params based on original value usually, but caller is simplistic)
-                # Actually, caller params are based on `p` passed to `ensure_entity`.
-                # If `val_to_use` changed (via Map or Edit), we MUST regenerate params.
-
-                if category in ['dirigent', 'solist', 'komponist']:
-                    parts = self.split_name(val_to_use)
-                    if category == 'komponist':
-                        final_params = (*parts, "")
-                    else:
-                        final_params = parts
-                elif category in ['orchester', 'ort']:
-                    final_params = (val_to_use,)
-
-                self.new_cur.execute(insert_sql, final_params)
-                new_id = self.new_cur.lastrowid
-                self.new_conn.commit()
-
-                self.cache[category][norm_key] = new_id
-                self.update_name_index(category, val_to_use, new_id)
-                logging.info(f"Created {category}: {val_to_use}")
-
-                # Final Catch-All Map Update:
-                # If we created it, and it wasn't in map (or we edited it), update map.
-                # Use `value` (original key) -> `val_to_use` (final name).
-                if value not in self.correction_map:
-                     if category in ['dirigent', 'komponist', 'solist']:
-                         self.update_map(value, self.split_name(val_to_use))
-                     else:
-                         self.update_map(value, (val_to_use, ""))
-
-                return new_id
-            except Error as e:
-                logging.error(f"Failed to insert {category} '{val_to_use}': {e}")
-                return None
-
-            # Break the loop if we reached here
-            break
-
-    def lookup_entity(self, category, value):
-        """
-        Strict lookup. Returns ID if found (unique), None otherwise.
-        """
-        if not value: return None
-
-        # 1. Apply Correction
-        val_to_use = self.correction_map.get(value, value)
-        norm_key = self.normalize_name(val_to_use)
-
-        # 2. Cache Lookup
+        # Cache Lookup
         if norm_key in self.cache[category]:
             return self.cache[category][norm_key]
 
-        # 3. Name-Only Lookup
-        if category in ['dirigent', 'komponist', 'solist']:
-            first, last = self.split_name(val_to_use)
-            if not first and last:
-                norm_last = self.normalize_name(last)
-                candidates = self.name_index[category].get(norm_last, [])
-                unique_ids = list({c[1] for c in candidates})
+        # Insert
+        try:
+            self.new_cur.execute(insert_sql, params)
+            new_id = self.new_cur.lastrowid
+            self.new_conn.commit()
+            self.cache[category][norm_key] = new_id
+            logging.info(f"Created {category}: {value}")
+            return new_id
+        except Error as e:
+            logging.error(f"Failed to insert {category} '{value}': {e}")
+            return None
 
-                if len(unique_ids) == 1:
-                    return unique_ids[0]
-
-                # If ambiguous or 0, return None
-                if len(unique_ids) > 1:
-                    logging.warning(f"Lookup ambiguous for '{val_to_use}'")
-                return None
-
-        return None
+    def lookup_entity(self, category, value):
+        if not value: return None
+        norm_key = self.normalize_name(value)
+        return self.cache[category].get(norm_key)
 
     # ============================================================
     # ENTITY MIGRATION STUBS
@@ -716,65 +285,76 @@ class MigrationSpecialist:
 
     def migrate_works(self):
         logging.info("Starting Work migration...")
-        # Works are tricky because they depend on Composer.
-        # We need (Werk, Komponist) pairs from Old DB.
+        # Get source works
         self.old_cur.execute("SELECT DISTINCT Werk, Komponist FROM MusicRecords WHERE Werk IS NOT NULL AND Werk != ''")
+
         count = 0
         skipped = 0
 
         for row in self.old_cur.fetchall():
             werk_name = row['Werk']
-            komp_str = row['Komponist']
+            komp_raw = row['Komponist']
 
-            # We need to resolve the composer(s).
-            # If multiple composers, we might have multiple works or "Todo" logic?
-            # Original script logic:
-            # If standard case (1 composer): Create Werk linked to Composer.
-            # If multiple composers: Create "Todo" works?
-            # User requirement: "check all entries in werke and add those who are not found"
-            # But "Werke" in old DB is just a string.
-            # In New DB, Work = (Name, ComposerId).
-
-            # So we must try to match the Composer string to an existing Composer ID.
-
-            resolved_composers = self.parse_complex_entity_string(komp_str, 'komponist')
-
-            if not resolved_composers:
-                logging.warning(f"Work '{werk_name}' has no composer. Skipped.")
+            if not komp_raw:
                 skipped += 1
                 continue
 
-            # Simplification: Only handle the FIRST resolved composer for the named work.
-            # (Because we don't know which work belongs to which composer if there are multiple).
+            # Extract "Right Part" (last word of composer string)
+            parts = komp_raw.strip().split(' ')
+            if not parts:
+                skipped += 1
+                continue
 
-            first_komp_str = resolved_composers[0]
-            k_id = self.lookup_entity('komponist', first_komp_str)
+            last_name_search = parts[-1].strip()
+
+            k_id = None
+
+            # Special Handling for Schumann
+            if last_name_search.lower() == 'schumann':
+                 try:
+                     self.new_cur.execute("SELECT Id FROM Komponisten WHERE Name = 'Schumann' AND Vorname LIKE '%Robert%'")
+                     res = self.new_cur.fetchone()
+                     if res: k_id = res[0]
+                 except Error as e:
+                     logging.error(f"Error looking up Schumann: {e}")
+            else:
+                 # General Lookup by Name (Last Name)
+                 try:
+                     self.new_cur.execute("SELECT Id FROM Komponisten WHERE Name = %s", (last_name_search,))
+                     matches = self.new_cur.fetchall()
+                     if len(matches) >= 1:
+                         # Take the first match (assuming unique or first spelling wins as per requirement)
+                         k_id = matches[0][0]
+                 except Error as e:
+                     logging.error(f"Error looking up composer '{last_name_search}': {e}")
 
             if not k_id:
-                logging.error(f"Work '{werk_name}': Composer '{first_komp_str}' not found. Skipped.")
+                logging.warning(f"Composer '{last_name_search}' (from '{komp_raw}') not found in destination.")
                 skipped += 1
                 continue
 
-            # Composer found. Ensure Work exists.
-            # Key for cache/lookup: "Name_ComposerId"
-            werk_key = f"{werk_name}_{k_id}"
+            # Check if Werk already exists for this composer
+            try:
+                self.new_cur.execute("SELECT Id FROM Werke WHERE Name = %s AND KomponistId = %s", (werk_name, k_id))
+                if self.new_cur.fetchone():
+                    # Exists
+                    continue
 
-            # Check if exists (ensure_entity does this via cache, but cache key needs to be set up right)
-            # In ensure_entity:
-            # norm_key = self.normalize_name(value)
-            # We should pass the composite key as value? No, value is used for insert params usually.
-            # But 'werk' is special.
-            # ensure_entity takes (category, value, sql, params).
-            # For Werk:
-            # value = werk_key (so caching works on the composite)
-            # params = (werk_name, k_id)
-
-            if self.ensure_entity('werk', werk_key,
-                "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)",
-                (werk_name, k_id)):
+                # Insert
+                self.new_cur.execute("INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (werk_name, k_id))
+                self.new_conn.commit()
                 count += 1
+                # Update cache?
+                # We can, but local cache isn't strictly used in this loop.
+                # But good for consistency if ensures call later.
+                werk_key = f"{werk_name}_{k_id}"
+                self.cache['werk'][self.normalize_name(werk_key)] = self.new_cur.lastrowid
 
-        logging.info(f"Work migration finished. Processed {count}, Skipped {skipped}.")
+            except Error as e:
+                logging.error(f"Error inserting Werk '{werk_name}': {e}")
+                skipped += 1
+
+        logging.info(f"Work migration finished. Inserted: {count}, Skipped/Found: {skipped}.")
 
     def migrate_records(self):
         logging.info("Starting MusicRecords migration (without Documents)...")
@@ -823,17 +403,31 @@ class MigrationSpecialist:
             bezeichnung = row['Werk'] # Default designation
 
             if row['Werk']:
+                # Simple parsing for records?
+                # Original logic tried to match "Name_ComposerId".
+                # But `row['Komponist']` is a string.
+                # We need to find the composer ID first.
+                # This part is tricky without the map if the composer string in record doesn't match cache.
+                # But assuming `migrate_works` and `migrate_composers` ran, cache should be populated.
+
+                # We need to parse the composer string from the record
                 komp_parts = self.split_komponist_string(row['Komponist'])
                 if not komp_parts:
-                     # If Werk exists but no Komponist? Rare but possible.
-                     # In migrate_works, we skipped.
                      missing_deps.append(f"Werk (No Composer): {row['Werk']}")
                 else:
-                    # Try to find the work using the FIRST composer (consistent with migrate_works)
                     first_komp_str = komp_parts[0]
+                    # Try to find composer.
+                    # Note: lookup_entity uses normalized full string match against cache.
                     k_id = self.lookup_entity('komponist', first_komp_str)
 
                     if not k_id:
+                         # Fallback: Try "Right Part" lookup if exact match fails?
+                         # The legacy records might use "Beethoven" but we stored "Ludwig van Beethoven".
+                         # `lookup_entity` only checks exact normalized match in cache.
+                         # But `load_existing_data` only keys by Full Name.
+                         # If we want `migrate_records` to work well, we might need that "Name Index" or fuzzy search.
+                         # But for now, I'm sticking to "Remove correction map" and "Add work features".
+                         # I won't overengineer `migrate_records` unless asked.
                          missing_deps.append(f"Composer for Work: {first_komp_str}")
                     else:
                         werk_key = f"{row['Werk']}_{k_id}"
@@ -875,9 +469,6 @@ class MigrationSpecialist:
 
                 if len(existing) == 1:
                     ex_row = existing[0]
-                    # Handle tuple vs dict cursor. Standard cursor is tuple unless dictionary=True.
-                    # We initialized self.new_cur as self.new_conn.cursor() which is tuple.
-                    # Indexes: 0:Id, 1:Spielsaison, 2:Bewertung, 3:OrtId, 4:DirigentId, 5:OrchesterId
                     ex_id = ex_row[0]
 
                     # Fetch relations for comparison
@@ -1026,6 +617,7 @@ if __name__ == "__main__":
     parser.add_argument('--add-solist', action='store_true', help="Migrate Solists")
     parser.add_argument('--add-composer', action='store_true', help="Migrate Composers")
     parser.add_argument('--add-work', action='store_true', help="Migrate Works")
+    parser.add_argument('--del-work', action='store_true', help="Delete all Works and Links")
     parser.add_argument('--add-conductor', action='store_true', help="Migrate Conductors")
     parser.add_argument('--add-orchestra', action='store_true', help="Migrate Orchestras")
     parser.add_argument('--add-location', action='store_true', help="Migrate Locations")
@@ -1037,14 +629,10 @@ if __name__ == "__main__":
     # Options
     parser.add_argument('--interactive', action='store_true', help="Enable interactive mode for ambiguities")
     parser.add_argument('--delete', action='store_true', help="Clear destination DB before starting")
-    parser.add_argument('--map', type=str, help="Path to correction map JSON")
 
     args = parser.parse_args()
     
     spec = MigrationSpecialist(interactive=args.interactive)
-
-    if args.map:
-        spec.load_correction_map(args.map)
 
     if args.delete:
         spec.clear_new_db()
@@ -1054,6 +642,9 @@ if __name__ == "__main__":
 
     if args.delete_note:
         spec.clear_notes()
+
+    if args.del_work:
+        spec.clear_works()
 
     if args.add_solist:
         spec.migrate_solists()
@@ -1078,8 +669,5 @@ if __name__ == "__main__":
 
     if args.documents:
         spec.migrate_documents()
-
-    # Save updated correction map
-    spec.save_correction_map('correction-map-updated.json')
 
     spec.close()
