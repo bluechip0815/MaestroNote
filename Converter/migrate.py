@@ -3,6 +3,8 @@ from mysql.connector import Error
 import argparse
 import sys
 import os
+import json
+import requests
 import unicodedata
 import re
 import logging
@@ -70,6 +72,73 @@ class MigrationSpecialist:
 
         # Load existing data from New DB
         self.load_existing_data()
+
+        # Load AI Settings
+        self.ai_settings = self.load_ai_settings()
+
+    def load_ai_settings(self):
+        try:
+            # Look for appsettings.json in parent directory or current
+            paths = ["../appsettings.json", "appsettings.json"]
+            for p in paths:
+                if os.path.exists(p):
+                    with open(p, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        return data.get("AiSettings", {})
+        except Exception as e:
+            logging.error(f"Failed to load appsettings.json: {e}")
+        return {}
+
+    def ask_ai_for_work(self, composer_name, werk_raw, bewertung_raw):
+        """
+        Asks AI to identify the specific work for a composer from a mixed string.
+        """
+        if not self.ai_settings.get("ApiKey"):
+            logging.warning("Skipping AI call: No API Key found.")
+            return werk_raw
+
+        api_key = self.ai_settings["ApiKey"]
+        url = f"{self.ai_settings.get('ProviderUrl', 'https://api.openai.com/v1')}/chat/completions"
+        model = self.ai_settings.get("Model", "gpt-4")
+
+        prompt = (
+            f"What kind of music belongs to the composer {composer_name} based on the given information? "
+            f"Info: '{werk_raw}', Note: '{bewertung_raw}'. "
+            "If you don't know return 'Ich weiss es nicht'. "
+            "Otherwise return the name of the music in German."
+        )
+
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.3
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+
+        try:
+            logging.info(f"🤖 Asking AI about '{composer_name}'...")
+            resp = requests.post(url, headers=headers, json=payload, timeout=10)
+            if resp.status_code == 200:
+                result = resp.json()
+                content = result['choices'][0]['message']['content'].strip()
+                if "Ich weiss es nicht" in content:
+                    logging.info(f"AI response: Unknown.")
+                    return None
+                logging.info(f"AI suggested: {content}")
+                return content.strip('"').strip("'")
+            else:
+                logging.error(f"AI Request failed: {resp.status_code} - {resp.text}")
+        except Exception as e:
+            logging.error(f"AI Exception: {e}")
+
+        return None
 
     def normalize_name(self, name):
         if not name: return ""
@@ -283,78 +352,112 @@ class MigrationSpecialist:
                 count += 1
         logging.info(f"Location migration finished. Processed {count} entries.")
 
+    def get_composer_id(self, name_str):
+        if not name_str: return None
+
+        # Generic Lookup by Name
+        try:
+            self.new_cur.execute("SELECT Id FROM Komponisten WHERE Name = %s", (name_str,))
+            matches = self.new_cur.fetchall()
+            if len(matches) >= 1:
+                return matches[0][0]
+        except Error as e:
+            logging.error(f"Error looking up composer '{name_str}': {e}")
+
+        return None
+
+    def resolve_work(self, composer_id, work_name):
+        """
+        Ensures a work exists for the given composer.
+        """
+        try:
+            self.new_cur.execute("SELECT Id FROM Werke WHERE Name = %s AND KomponistId = %s", (work_name, composer_id))
+            res = self.new_cur.fetchone()
+            if res:
+                return res[0]
+
+            # Insert
+            self.new_cur.execute("INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (work_name, composer_id))
+            self.new_conn.commit()
+            new_id = self.new_cur.lastrowid
+
+            # Update cache
+            werk_key = f"{work_name}_{composer_id}"
+            self.cache['werk'][self.normalize_name(werk_key)] = new_id
+
+            return new_id
+        except Error as e:
+            logging.error(f"Error resolving Werk '{work_name}' for Composer ID {composer_id}: {e}")
+            return None
+
     def migrate_works(self):
         logging.info("Starting Work migration...")
         # Get source works
-        self.old_cur.execute("SELECT DISTINCT Werk, Komponist FROM MusicRecords WHERE Werk IS NOT NULL AND Werk != ''")
+        # NEW: Need Bewertung1 for AI context
+        self.old_cur.execute("SELECT DISTINCT Werk, Komponist, Bewertung1 FROM MusicRecords WHERE Werk IS NOT NULL AND Werk != ''")
 
         count = 0
         skipped = 0
 
         for row in self.old_cur.fetchall():
-            werk_name = row['Werk']
+            werk_name_original = row['Werk']
             komp_raw = row['Komponist']
+            bewertung_raw = row.get('Bewertung1', '')
 
             if not komp_raw:
                 skipped += 1
                 continue
 
-            # Extract "Right Part" (last word of composer string)
-            parts = komp_raw.strip().split(' ')
-            if not parts:
-                skipped += 1
-                continue
-
-            last_name_search = parts[-1].strip()
-
-            k_id = None
-
-            # Special Handling for Schumann
-            if last_name_search.lower() == 'schumann':
-                 try:
-                     self.new_cur.execute("SELECT Id FROM Komponisten WHERE Name = 'Schumann' AND Vorname LIKE '%Robert%'")
-                     res = self.new_cur.fetchone()
-                     if res: k_id = res[0]
-                 except Error as e:
-                     logging.error(f"Error looking up Schumann: {e}")
+            # Parse Composer String
+            composer_names = []
+            is_multi = False
+            if ',' in komp_raw:
+                # Multiple composers
+                composer_names = [x.strip() for x in komp_raw.split(',') if x.strip()]
+                is_multi = True
             else:
-                 # General Lookup by Name (Last Name)
-                 try:
-                     self.new_cur.execute("SELECT Id FROM Komponisten WHERE Name = %s", (last_name_search,))
-                     matches = self.new_cur.fetchall()
-                     if len(matches) >= 1:
-                         # Take the first match (assuming unique or first spelling wins as per requirement)
-                         k_id = matches[0][0]
-                 except Error as e:
-                     logging.error(f"Error looking up composer '{last_name_search}': {e}")
+                # Single composer -> take last part
+                parts = komp_raw.strip().split(' ')
+                if parts:
+                    composer_names = [parts[-1].strip()]
 
-            if not k_id:
-                logging.warning(f"Composer '{last_name_search}' (from '{komp_raw}') not found in destination.")
+            if not composer_names:
                 skipped += 1
                 continue
 
-            # Check if Werk already exists for this composer
-            try:
-                self.new_cur.execute("SELECT Id FROM Werke WHERE Name = %s AND KomponistId = %s", (werk_name, k_id))
-                if self.new_cur.fetchone():
-                    # Exists
+            for c_name in composer_names:
+                c_id = self.get_composer_id(c_name)
+
+                if not c_id:
+                    logging.warning(f"Composer '{c_name}' (from '{komp_raw}') not found in destination.")
+                    skipped += 1
                     continue
 
-                # Insert
-                self.new_cur.execute("INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (werk_name, k_id))
-                self.new_conn.commit()
-                count += 1
-                # Update cache?
-                # We can, but local cache isn't strictly used in this loop.
-                # But good for consistency if ensures call later.
-                werk_key = f"{werk_name}_{k_id}"
-                self.cache['werk'][self.normalize_name(werk_key)] = self.new_cur.lastrowid
+                final_werk_name = werk_name_original
 
-            except Error as e:
-                logging.error(f"Error inserting Werk '{werk_name}': {e}")
-                skipped += 1
+                # AI Call if multiple composers
+                if is_multi:
+                    ai_suggestion = self.ask_ai_for_work(c_name, werk_name_original, bewertung_raw)
+                    if ai_suggestion:
+                        final_werk_name = ai_suggestion
+                    else:
+                        # Fallback or Skip?
+                        # Requirement: "if you don't return 'Ich weiss es nicht' otherwise return the name"
+                        # Implicitly implies: if unknown, maybe we shouldn't link it?
+                        # Or do we link the original full string?
+                        # Safe bet: If AI fails, use original string but warn.
+                        # OR: If AI returns None, it means "Ich weiss es nicht", so maybe we shouldn't create a wrong work.
+                        # However, to be safe, I'll fallback to original name so we don't lose data,
+                        # but usually multi-composer works are split by AI.
+                        pass
 
-        logging.info(f"Work migration finished. Inserted: {count}, Skipped/Found: {skipped}.")
+                # Function Call to resolve/create work
+                if self.resolve_work(c_id, final_werk_name):
+                    count += 1
+                else:
+                    skipped += 1
+
+        logging.info(f"Work migration finished. Processed/Inserted: {count}, Skipped/Issues: {skipped}.")
 
     def migrate_records(self):
         logging.info("Starting MusicRecords migration (without Documents)...")
