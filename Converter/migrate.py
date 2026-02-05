@@ -283,6 +283,44 @@ class MigrationSpecialist:
                 count += 1
         logging.info(f"Location migration finished. Processed {count} entries.")
 
+    def get_composer_id(self, name_str):
+        if not name_str: return None
+
+        # Generic Lookup by Name
+        try:
+            self.new_cur.execute("SELECT Id FROM Komponisten WHERE Name = %s", (name_str,))
+            matches = self.new_cur.fetchall()
+            if len(matches) >= 1:
+                return matches[0][0]
+        except Error as e:
+            logging.error(f"Error looking up composer '{name_str}': {e}")
+
+        return None
+
+    def resolve_work(self, composer_id, work_name):
+        """
+        Ensures a work exists for the given composer.
+        """
+        try:
+            self.new_cur.execute("SELECT Id FROM Werke WHERE Name = %s AND KomponistId = %s", (work_name, composer_id))
+            res = self.new_cur.fetchone()
+            if res:
+                return res[0]
+
+            # Insert
+            self.new_cur.execute("INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (work_name, composer_id))
+            self.new_conn.commit()
+            new_id = self.new_cur.lastrowid
+
+            # Update cache
+            werk_key = f"{work_name}_{composer_id}"
+            self.cache['werk'][self.normalize_name(werk_key)] = new_id
+
+            return new_id
+        except Error as e:
+            logging.error(f"Error resolving Werk '{work_name}' for Composer ID {composer_id}: {e}")
+            return None
+
     def migrate_works(self):
         logging.info("Starting Work migration...")
         # Get source works
@@ -299,62 +337,36 @@ class MigrationSpecialist:
                 skipped += 1
                 continue
 
-            # Extract "Right Part" (last word of composer string)
-            parts = komp_raw.strip().split(' ')
-            if not parts:
-                skipped += 1
-                continue
-
-            last_name_search = parts[-1].strip()
-
-            k_id = None
-
-            # Special Handling for Schumann
-            if last_name_search.lower() == 'schumann':
-                 try:
-                     self.new_cur.execute("SELECT Id FROM Komponisten WHERE Name = 'Schumann' AND Vorname LIKE '%Robert%'")
-                     res = self.new_cur.fetchone()
-                     if res: k_id = res[0]
-                 except Error as e:
-                     logging.error(f"Error looking up Schumann: {e}")
+            # Parse Composer String
+            composer_names = []
+            if ',' in komp_raw:
+                # Multiple composers
+                composer_names = [x.strip() for x in komp_raw.split(',') if x.strip()]
             else:
-                 # General Lookup by Name (Last Name)
-                 try:
-                     self.new_cur.execute("SELECT Id FROM Komponisten WHERE Name = %s", (last_name_search,))
-                     matches = self.new_cur.fetchall()
-                     if len(matches) >= 1:
-                         # Take the first match (assuming unique or first spelling wins as per requirement)
-                         k_id = matches[0][0]
-                 except Error as e:
-                     logging.error(f"Error looking up composer '{last_name_search}': {e}")
+                # Single composer -> take last part
+                parts = komp_raw.strip().split(' ')
+                if parts:
+                    composer_names = [parts[-1].strip()]
 
-            if not k_id:
-                logging.warning(f"Composer '{last_name_search}' (from '{komp_raw}') not found in destination.")
+            if not composer_names:
                 skipped += 1
                 continue
 
-            # Check if Werk already exists for this composer
-            try:
-                self.new_cur.execute("SELECT Id FROM Werke WHERE Name = %s AND KomponistId = %s", (werk_name, k_id))
-                if self.new_cur.fetchone():
-                    # Exists
+            for c_name in composer_names:
+                c_id = self.get_composer_id(c_name)
+
+                if not c_id:
+                    logging.warning(f"Composer '{c_name}' (from '{komp_raw}') not found in destination.")
+                    skipped += 1
                     continue
 
-                # Insert
-                self.new_cur.execute("INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)", (werk_name, k_id))
-                self.new_conn.commit()
-                count += 1
-                # Update cache?
-                # We can, but local cache isn't strictly used in this loop.
-                # But good for consistency if ensures call later.
-                werk_key = f"{werk_name}_{k_id}"
-                self.cache['werk'][self.normalize_name(werk_key)] = self.new_cur.lastrowid
+                # Function Call to resolve/create work
+                if self.resolve_work(c_id, werk_name):
+                    count += 1
+                else:
+                    skipped += 1
 
-            except Error as e:
-                logging.error(f"Error inserting Werk '{werk_name}': {e}")
-                skipped += 1
-
-        logging.info(f"Work migration finished. Inserted: {count}, Skipped/Found: {skipped}.")
+        logging.info(f"Work migration finished. Processed/Inserted: {count}, Skipped/Issues: {skipped}.")
 
     def migrate_records(self):
         logging.info("Starting MusicRecords migration (without Documents)...")
