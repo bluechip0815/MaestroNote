@@ -187,19 +187,6 @@ class MigrationSpecialist:
 
         return resolved_names
 
-    def clear_new_db(self):
-        logging.info("⚠️ Lösche neue Datenbank für frischen Import...")
-        tables = [
-            "MusicRecordSolist", "MusicRecordWerk", "MusicRecords", 
-            "Solisten", "Werke", "Komponisten", "Orchester", "Dirigenten", "Orte", "Documents"
-        ]
-        self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
-        for table in tables:
-            try: self.new_cur.execute(f"TRUNCATE TABLE {table};")
-            except: pass
-        self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
-        self.new_conn.commit()
-
     def clear_works(self):
         logging.info("⚠️ Lösche Werke und Verknüpfungen...")
         self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
@@ -209,6 +196,19 @@ class MigrationSpecialist:
             logging.info("✓ Werke tables truncated.")
         except Error as e:
             logging.error(f"❌ Error truncating works: {e}")
+        self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
+        self.new_conn.commit()
+
+    def clear_notes_full(self):
+        logging.info("⚠️ Deleting all Notes (MusicRecords, Documents, Links)...")
+        self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
+        tables = ["MusicRecords", "Documents", "MusicRecordWerk", "MusicRecordSolist"]
+        for t in tables:
+            try:
+                self.new_cur.execute(f"TRUNCATE TABLE {t};")
+                logging.info(f"✓ Truncated {t}")
+            except Error as e:
+                logging.error(f"❌ Error truncating {t}: {e}")
         self.new_cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
         self.new_conn.commit()
 
@@ -503,7 +503,11 @@ class MigrationSpecialist:
 
             # Werke
             w_ids = []
-            bezeichnung = row['Werk'] # Default designation
+
+            # Determine Bezeichnung based on Composer
+            bezeichnung = row['Werk']
+            if row['Komponist'] and ',' in row['Komponist']:
+                bezeichnung = "Konzert"
 
             if row['Werk']:
                 # Simple parsing for records?
@@ -689,24 +693,6 @@ class MigrationSpecialist:
         self.new_conn.commit()
         logging.info(f"Documents migration finished. Processed {count}, Skipped {skipped}.")
 
-    def clear_documents(self):
-        logging.info("Clearing Documents table...")
-        try:
-            self.new_cur.execute("TRUNCATE TABLE Documents")
-            self.new_conn.commit()
-            logging.info("Documents table cleared.")
-        except Error as e:
-            logging.error(f"Failed to clear Documents: {e}")
-
-    def clear_notes(self):
-        logging.info("Clearing Notes (Bewertung) in MusicRecords...")
-        try:
-            self.new_cur.execute("UPDATE MusicRecords SET Bewertung = ''")
-            self.new_conn.commit()
-            logging.info("Notes cleared.")
-        except Error as e:
-            logging.error(f"Failed to clear Notes: {e}")
-
     def close(self):
         self.old_cur.close()
         self.old_conn.close()
@@ -724,30 +710,21 @@ if __name__ == "__main__":
     parser.add_argument('--add-conductor', action='store_true', help="Migrate Conductors")
     parser.add_argument('--add-orchestra', action='store_true', help="Migrate Orchestras")
     parser.add_argument('--add-location', action='store_true', help="Migrate Locations")
-    parser.add_argument('--notes', action='store_true', help="Migrate MusicRecords (without Documents)")
-    parser.add_argument('--documents', action='store_true', help="Migrate Documents table")
-    parser.add_argument('--delete-doc', action='store_true', help="Clear Document table")
-    parser.add_argument('--delete-note', action='store_true', help="Remove Bemerkung only")
+    parser.add_argument('--del-note', action='store_true', help="Delete all Notes (Records, Docs, Links)")
+    parser.add_argument('--add-note', action='store_true', help="Migrate MusicRecords and Documents")
 
     # Options
     parser.add_argument('--interactive', action='store_true', help="Enable interactive mode for ambiguities")
-    parser.add_argument('--delete', action='store_true', help="Clear destination DB before starting")
 
     args = parser.parse_args()
     
     spec = MigrationSpecialist(interactive=args.interactive)
 
-    if args.delete:
-        spec.clear_new_db()
-
-    if args.delete_doc:
-        spec.clear_documents()
-
-    if args.delete_note:
-        spec.clear_notes()
-
     if args.del_work:
         spec.clear_works()
+
+    if args.del_note:
+        spec.clear_notes_full()
 
     if args.add_solist:
         spec.migrate_solists()
@@ -767,10 +744,8 @@ if __name__ == "__main__":
     if args.add_work:
         spec.migrate_works()
 
-    if args.notes:
+    if args.add_note:
         spec.migrate_records()
-
-    if args.documents:
         spec.migrate_documents()
 
     spec.close()
