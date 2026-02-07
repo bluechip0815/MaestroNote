@@ -275,28 +275,84 @@ class MigrationSpecialist:
                 count += 1
         logging.info(f"Location migration finished. Processed {count} entries.")
 
-    # (Previous migrate_works, migrate_records, etc. are removed/replaced)
-
     def migrate_works(self):
-         # Kept as stub or previous implementation if --add-work is still needed.
-         # The user did NOT say remove --add-work. I should probably keep it or leave it as is.
-         # But I am rewriting the file. I will restore a basic version or the original if possible.
-         # Since I don't have the full original code in memory (I read it once), I will re-implement a simple version
-         # or assume the user focuses on --add-note.
-         # Actually, the user instructions were specific about removing certain flags.
-         # --add-work was NOT in the removal list.
-         # However, for the sake of this task, I will focus on --add-note.
-         # If I must support --add-work, I should have copied it.
-         # I'll implement a stub log that says "Not implemented in this refactor"
-         # or try to implement it if needed.
-         # But wait, --add-note relies on Werke being populated.
-         # So --add-work MUST have run before.
-         # I will assume --add-work was run using the OLD script or I need to include it.
-         # Given I'm overwriting the file, I should try to keep --add-work logic if I can.
-         # ...
-         # I will omit it for now to keep the file clean and focus on the requested changes.
-         # The user said "Prerequisites: assume that the Werke and Komponisten tables in the destination are already populated".
-         logging.warning("--add-work is not available in this version.")
+        logging.info("Starting Works migration (--add-work)...")
+        self.load_lookup_data()
+
+        # Select distinct pairs to process
+        self.old_cur.execute("SELECT DISTINCT Komponist, Werk FROM MusicRecords WHERE Werk IS NOT NULL AND Werk != ''")
+        rows = self.old_cur.fetchall()
+
+        count_inserted = 0
+        count_skipped = 0
+        count_errors = 0
+
+        for row in rows:
+            k_str = row['Komponist']
+            w_str = row['Werk']
+
+            if not k_str:
+                logging.warning(f"Skipping work '{w_str}' because Komponist is empty.")
+                count_errors += 1
+                continue
+
+            # Split by comma
+            k_parts = [p.strip() for p in k_str.split(',') if p.strip()]
+            w_parts = [p.strip() for p in w_str.split(',') if p.strip()]
+
+            # Rule: If Werk has commas, Komponist must match count
+            if len(w_parts) > 1:
+                if len(k_parts) != len(w_parts):
+                    logging.error(f"❌ Mismatch: '{k_str}' vs '{w_str}'. Werk has {len(w_parts)} parts, Komponist has {len(k_parts)}. Skipping.")
+                    count_errors += 1
+                    continue
+
+                # Pairwise matching
+                pairs = zip(k_parts, w_parts)
+            else:
+                # Werk has 1 part or 0 (but filtered by SQL for != '').
+                # If Komponist has multiple, we create multiple works (1 per composer).
+                if not w_parts:
+                    continue
+                w_single = w_parts[0]
+                pairs = [(k, w_single) for k in k_parts]
+
+            for k_part, w_part in pairs:
+                # Get Surname
+                # "Ludwig van Beethoven" -> "Beethoven"
+                if not k_part: continue
+
+                surname = k_part.split(' ')[-1]
+                c_id = self.komponisten.get(surname)
+
+                if not c_id:
+                    logging.error(f"❌ Komponist '{surname}' (from '{k_part}') not found in destination. Skipping work '{w_part}'.")
+                    count_errors += 1
+                    continue
+
+                # Check if work already exists
+                # self.werke is keyed by (Name, KomponistId) -> Id
+                if (w_part, c_id) in self.werke:
+                    # Duplicate handling: Skip
+                    # logging.info(f"Work '{w_part}' for composer '{surname}' already exists. Skipping.")
+                    count_skipped += 1
+                    continue
+
+                # Insert
+                try:
+                    self.new_cur.execute(
+                        "INSERT INTO Werke (Name, KomponistId) VALUES (%s, %s)",
+                        (w_part, c_id)
+                    )
+                    new_id = self.new_cur.lastrowid
+                    self.werke[(w_part, c_id)] = new_id # Update cache
+                    count_inserted += 1
+                except Error as e:
+                    logging.error(f"❌ Failed to insert Work '{w_part}' for '{surname}': {e}")
+                    count_errors += 1
+
+        self.new_conn.commit()
+        logging.info(f"Works migration finished. Inserted: {count_inserted}, Skipped (duplicate): {count_skipped}, Errors: {count_errors}")
 
     # ============================================================
     # NEW FUNCTIONALITY
