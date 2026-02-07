@@ -154,7 +154,13 @@
                     {
                         <tr>
                             <td class="fw-bold text-primary">@record.KomponistNames</td>
-                            <td class="fw-bold">@record.WerkNames</td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(record.Bezeichnung))
+                                {
+                                    <div class="small text-muted">@record.Bezeichnung</div>
+                                }
+                                <div class="fw-bold">@record.WerkNames</div>
+                            </td>
                             <td>
                                 <div>@record.OrchesterName</div>
                                 <div class="text-muted small">@record.DirigentName</div>
