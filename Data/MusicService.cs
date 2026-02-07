@@ -102,6 +102,7 @@ namespace MaestroNotes.Data
                 Datum = m.Datum,
                 Spielsaison = m.Spielsaison,
                 Ort = m.OrtEntity?.Name ?? "",
+                Bezeichnung = m.Bezeichnung,
                 Bewertung = m.Bewertung,
                 KomponistNames = string.Join(", ", m.Werke.Select(w => w.Komponist?.Name ?? "").Where(s => !string.IsNullOrEmpty(s)).Distinct()),
                 WerkNames = string.Join(", ", m.Werke.Select(w => w.Name)),

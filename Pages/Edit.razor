@@ -8,6 +8,14 @@
     <DataAnnotationsValidator />
     <ValidationSummary />
 
+    <!-- BEZEICHNUNG -->
+    <div class="form-group row mb-2">
+        <label class="col-sm-2 col-form-label">Bezeichnung:</label>
+        <div class="col-sm-10">
+            <InputText class="form-control" @bind-Value="currentRecord.Bezeichnung" />
+        </div>
+    </div>
+
     <!-- ORCHESTER -->
     <div class="form-group row">
         <label class="col-sm-2 col-form-label">Orchester:</label>

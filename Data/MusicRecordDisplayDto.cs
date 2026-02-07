@@ -6,6 +6,7 @@ namespace MaestroNotes.Data
         public DateTime Datum { get; set; }
         public string Spielsaison { get; set; } = "";
         public string Ort { get; set; } = "";
+        public string Bezeichnung { get; set; } = "";
         public string Bewertung { get; set; } = "";
 
         public string KomponistNames { get; set; } = "";
