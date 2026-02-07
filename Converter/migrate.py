@@ -300,23 +300,49 @@ class MigrationSpecialist:
             k_parts = [p.strip() for p in k_str.split(',') if p.strip()]
             w_parts = [p.strip() for p in w_str.split(',') if p.strip()]
 
-            # Rule: If Werk has commas, Komponist must match count
-            if len(w_parts) > 1:
-                if len(k_parts) != len(w_parts):
-                    logging.error(f"❌ Mismatch: '{k_str}' vs '{w_str}'. Werk has {len(w_parts)} parts, Komponist has {len(k_parts)}. Skipping.")
-                    count_errors += 1
-                    continue
+            pairs = []
 
-                # Pairwise matching
-                pairs = zip(k_parts, w_parts)
+            # ----------------------------------------------------
+            # LOGIC for matching (Composer vs Werk)
+            # ----------------------------------------------------
+            if len(w_parts) > 1:
+                # Case A: Werk has commas
+                if len(k_parts) > 1:
+                    # Both have commas: STRICT PAIRWISE MATCH
+                    if len(k_parts) != len(w_parts):
+                        logging.error(f"❌ Mismatch: '{k_str}' vs '{w_str}'. Werk has {len(w_parts)} parts, Komponist has {len(k_parts)}. Skipping.")
+                        count_errors += 1
+                        continue
+                    pairs = zip(k_parts, w_parts)
+                else:
+                    # Werk has commas, Komponist is SINGLE (1 or 0 but not empty string due to check above)
+                    # Assign single composer to ALL works
+                    if not k_parts:
+                        # Should be covered by `if not k_str` but let's be safe
+                        continue
+                    single_k = k_parts[0]
+                    pairs = [(single_k, w) for w in w_parts]
+
             else:
-                # Werk has 1 part or 0 (but filtered by SQL for != '').
-                # If Komponist has multiple, we create multiple works (1 per composer).
+                # Case B: Werk is SINGLE (or empty/none, but loop filters empty)
                 if not w_parts:
                     continue
-                w_single = w_parts[0]
-                pairs = [(k, w_single) for k in k_parts]
 
+                w_single = w_parts[0]
+
+                if len(k_parts) > 1:
+                    # Komponist has commas, Werk is SINGLE
+                    # Assign single work to ALL composers
+                    pairs = [(k, w_single) for k in k_parts]
+                else:
+                    # Both are SINGLE
+                    if not k_parts: continue
+                    pairs = [(k_parts[0], w_single)]
+
+
+            # ----------------------------------------------------
+            # INSERT LOOP
+            # ----------------------------------------------------
             for k_part, w_part in pairs:
                 # Get Surname
                 # "Ludwig van Beethoven" -> "Beethoven"
