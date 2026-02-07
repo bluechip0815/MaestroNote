@@ -116,80 +116,84 @@
     <div class="row mt-4">
         <!-- WERKE -->
         <div class="col-md-6">
-            <div class="form-group">
-                <label>Werke:</label>
-                <table class="table table-sm table-bordered">
-                    <tbody>
-                        @foreach (var w in currentRecord.Werke)
-                        {
-                            <tr>
-                                <td>@w.Name (@(w.Komponist?.Name ?? "Unbekannt"))</td>
-                                <td style="width: 50px;">
-                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveWerk(w)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-                <div class="row">
-                    <div class="col-sm-7">
-                        <select class="form-control" @bind="selectedWerkToAddId">
-                            <option value="">Werk auswählen...</option>
-                            @foreach (var w in WerkeList)
+            <details class="spoiler">
+                <summary class="spoiler-header">Werke (@currentRecord.Werke.Count)</summary>
+                <div class="spoiler-content">
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                            @foreach (var w in currentRecord.Werke)
                             {
-                                <option value="@w.Id">@w.Name (@(w.Komponist?.Name ?? "Unbekannt"))</option>
+                                <tr>
+                                    <td>@w.Name (@(w.Komponist?.Name ?? "Unbekannt"))</td>
+                                    <td style="width: 50px;">
+                                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveWerk(w)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
                             }
-                        </select>
-                    </div>
-                    <div class="col-sm-5 d-flex">
-                        <button type="button" class="btn btn-sm btn-secondary me-1" @onclick="AddSelectedWerk">Hinzufügen</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewWerk = true">
-                             + Neu
-                        </button>
+                        </tbody>
+                    </table>
+                    <div class="row">
+                        <div class="col-sm-7">
+                            <select class="form-control" @bind="selectedWerkToAddId">
+                                <option value="">Werk auswählen...</option>
+                                @foreach (var w in WerkeList)
+                                {
+                                    <option value="@w.Id">@w.Name (@(w.Komponist?.Name ?? "Unbekannt"))</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-sm-5 d-flex">
+                            <button type="button" class="btn btn-sm btn-secondary me-1" @onclick="AddSelectedWerk">Hinzufügen</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewWerk = true">
+                                 + Neu
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </details>
         </div>
 
         <!-- SOLISTEN -->
         <div class="col-md-6">
-            <div class="form-group">
-                <label>Solisten:</label>
-                <table class="table table-sm table-bordered">
-                    <tbody>
-                        @foreach (var s in currentRecord.Solisten)
-                        {
-                            <tr>
-                                <td>@s.Name, @s.Vorname</td>
-                                <td style="width: 50px;">
-                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveSolist(s)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-                <div class="row">
-                    <div class="col-sm-7">
-                        <select class="form-control" @bind="selectedSolistToAddId">
-                            <option value="">Solist auswählen...</option>
-                            @foreach (var s in SolistenList)
+            <details class="spoiler">
+                <summary class="spoiler-header">Solisten (@currentRecord.Solisten.Count)</summary>
+                <div class="spoiler-content">
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                            @foreach (var s in currentRecord.Solisten)
                             {
-                                <option value="@s.Id">@s.Name, @s.Vorname</option>
+                                <tr>
+                                    <td>@s.Name, @s.Vorname</td>
+                                    <td style="width: 50px;">
+                                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveSolist(s)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
                             }
-                        </select>
-                    </div>
-                    <div class="col-sm-5 d-flex">
-                        <button type="button" class="btn btn-sm btn-secondary me-1" @onclick="AddSelectedSolist">Hinzufügen</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewSolist = true">
-                             + Neu
-                        </button>
+                        </tbody>
+                    </table>
+                    <div class="row">
+                        <div class="col-sm-7">
+                            <select class="form-control" @bind="selectedSolistToAddId">
+                                <option value="">Solist auswählen...</option>
+                                @foreach (var s in SolistenList)
+                                {
+                                    <option value="@s.Id">@s.Name, @s.Vorname</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-sm-5 d-flex">
+                            <button type="button" class="btn btn-sm btn-secondary me-1" @onclick="AddSelectedSolist">Hinzufügen</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewSolist = true">
+                                 + Neu
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </details>
         </div>
     </div>
 

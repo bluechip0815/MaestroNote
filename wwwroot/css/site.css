@@ -203,3 +203,51 @@ a:hover, .btn-link:hover {
         padding-bottom: 10px;
     }
 }
+
+/* Spoiler Styles */
+details.spoiler {
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+    background-color: #fff;
+}
+
+summary.spoiler-header {
+    padding: 0.75rem 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid transparent;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    list-style: none;
+    outline: none;
+    transition: background-color 0.2s;
+}
+
+summary.spoiler-header:hover {
+    background-color: #e9ecef;
+}
+
+summary.spoiler-header::-webkit-details-marker {
+    display: none;
+}
+
+details.spoiler[open] summary.spoiler-header {
+    border-bottom: 1px solid #dee2e6;
+}
+
+summary.spoiler-header::after {
+    content: '\25BC';
+    font-size: 0.8em;
+    transition: transform 0.2s ease;
+}
+
+details.spoiler[open] summary.spoiler-header::after {
+    transform: rotate(180deg);
+}
+
+.spoiler-content {
+    padding: 1rem;
+}
