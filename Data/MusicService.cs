@@ -364,12 +364,12 @@ namespace MaestroNotes.Data
         public List<Ort> GetAllOrte() => _context.Orte.ToList();
 
         // NoTracking variants for Master Data Management to avoid context tracking conflicts
-        public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().ToList();
-        public List<Werk> GetAllWerkeNoTracking() => _context.Werke.Include(w => w.Komponist).AsNoTracking().ToList();
-        public List<Orchester> GetAllOrchesterNoTracking() => _context.Orchester.AsNoTracking().ToList();
-        public List<Dirigent> GetAllDirigentenNoTracking() => _context.Dirigenten.AsNoTracking().ToList();
-        public List<Solist> GetAllSolistenNoTracking() => _context.Solisten.AsNoTracking().ToList();
-        public List<Ort> GetAllOrteNoTracking() => _context.Orte.AsNoTracking().ToList();
+        public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().OrderBy(o=>o.Name).ToList();
+        public List<Werk> GetAllWerkeNoTracking() => _context.Werke.Include(w => w.Komponist).AsNoTracking().OrderBy(o => o.Name).ToList();
+        public List<Orchester> GetAllOrchesterNoTracking() => _context.Orchester.AsNoTracking().OrderBy(o => o.Name).ToList();
+        public List<Dirigent> GetAllDirigentenNoTracking() => _context.Dirigenten.AsNoTracking().OrderBy(o => o.Name).ToList();
+        public List<Solist> GetAllSolistenNoTracking() => _context.Solisten.AsNoTracking().OrderBy(o => o.Name).ToList();
+        public List<Ort> GetAllOrteNoTracking() => _context.Orte.AsNoTracking().OrderBy(o=>o.Name).ToList();
 
         public async Task AddKomponist(Komponist k)
         {

@@ -21,7 +21,7 @@ namespace MaestroNotes.Data
         {
             DocumentsPath = cfg.GetValue<string>("Documents") ?? "";
             ImagesPath = cfg.GetValue<string>("Images") ?? "";
-            PasswordRO = cfg.GetValue<string>("Password") ?? "Gast";
+            PasswordRO = cfg.GetValue<string>("Password") ?? "truoel";
             PasswordRW = cfg.GetValue<string>("Password-Write") ?? "Nilsau";
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
