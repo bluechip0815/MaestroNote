@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace DbToRtf
+namespace MaestroNotes.Data.Export
 {
     public class RtfExporter
     {
@@ -21,20 +21,20 @@ namespace DbToRtf
             if (!ImagePath.EndsWith(System.IO.Path.DirectorySeparatorChar))
                 ImagePath += System.IO.Path.DirectorySeparatorChar;
         }
-        public void ExportToRtf(string rtfFilePath, List<MusicRecord> records)
+        public void ExportToRtf(string rtfFilePath, List<RtfRecord> records)
         {
             // --- Top 10 Komponisten ---
             var topKomponisten = records
-                .Where(r => !string.IsNullOrWhiteSpace(r.Komponist))
-                .GroupBy(r => r.Komponist.Trim())
+                .Where(r => !string.IsNullOrWhiteSpace(r.Komponist.Name))
+                .GroupBy(r => r.Komponist.Name.Trim())
                 .OrderByDescending(g => g.Count())
                 .Take(10)
                 .ToList();
 
             // --- Top 10 Dirigenten ---
             var topDirigenten = records
-                .Where(r => !string.IsNullOrWhiteSpace(r.Dirigent))
-                .GroupBy(r => r.Dirigent.Trim())
+                .Where(r => !string.IsNullOrWhiteSpace(r.Dirigent.Name))
+                .GroupBy(r => r.Dirigent.Name.Trim())
                 .OrderByDescending(g => g.Count())
                 .Take(10)
                 .ToList();
@@ -57,7 +57,7 @@ namespace DbToRtf
             Console.WriteLine("RTF file written: " + rtfFilePath);
         }
 
-        private void ExportTop10ToRtf(List<MusicRecord> records, StringBuilder sb, List<IGrouping<string, MusicRecord>> topKomponisten, List<IGrouping<string, MusicRecord>> topDirigenten)
+        private void ExportTop10ToRtf(List<RtfRecord> records, StringBuilder sb, List<IGrouping<string, RtfRecord>> topKomponisten, List<IGrouping<string, RtfRecord>> topDirigenten)
         {
             sb.AppendLine(@"\pard\qc\f0\fs24\b Top 10\b0\par\par");
 
@@ -84,10 +84,10 @@ namespace DbToRtf
             sb.AppendLine(@"\par");
         }
 
-        private void ExportKomponistenToRtf(List<MusicRecord> records, StringBuilder sb, List<IGrouping<string, MusicRecord>> topKomponisten)
+        private void ExportKomponistenToRtf(List<RtfRecord> records, StringBuilder sb, List<IGrouping<string, RtfRecord>> topKomponisten)
         {
             var sorted = records
-                .OrderBy(r => r._komponist.OrderName)
+                .OrderBy(r => r.Komponist.Name)
                 .ThenBy(r => r.Werk)
                 .ThenBy(r => r.Dirigent)
                 .ThenBy(r => DateTime.TryParse(r.Datum, out var dt) ? dt : DateTime.MinValue)
@@ -98,48 +98,48 @@ namespace DbToRtf
             double h = w * 2 / 3;
             AppendImageToRtf(sb, "Komponisten.jpg", "Komponisten", list, w, h, false);
 
-            string? lastKomponist = null;
+            Person? lastKomponist = new();
             foreach (var record in sorted)
             {
-                if (string.IsNullOrWhiteSpace(record.Komponist) ||
+                if (string.IsNullOrWhiteSpace(record.Komponist.Name) ||
                     string.IsNullOrWhiteSpace(record.Werk))
                     continue;
 
-                if (record.Komponist.Contains("div.", StringComparison.CurrentCultureIgnoreCase) ||
+                if (record.Komponist.Name.Contains("div.", StringComparison.CurrentCultureIgnoreCase) ||
                     record.Werk.Contains("div.", StringComparison.CurrentCultureIgnoreCase) ||
                     record.Werk.Equals("-", StringComparison.CurrentCultureIgnoreCase) ||
                     record.Werk.Contains("divers", StringComparison.CurrentCultureIgnoreCase))
                     continue;
 
-                if (record.Komponist != lastKomponist)
+                if (record.Komponist.Name != lastKomponist.Name)
                 {
                     if (lastKomponist != null)
                         sb.AppendLine(@"\par");
 
                     // Method 1: Using Any()
-                    if (topKomponisten.Any(g => g.Key.Equals(record.Komponist, StringComparison.OrdinalIgnoreCase)))
+                    if (topKomponisten.Any(g => g.Key.Equals(record.Komponist.Name, StringComparison.OrdinalIgnoreCase)))
                     {
                         // insert a picture
-                        AppendImageToRtf(sb, record.Komponist + ".jpg", record.Komponist, null, (7 * 1440) / 2.54);
+                        AppendImageToRtf(sb, record.Komponist + ".jpg", record.Komponist.Name, null, (7 * 1440) / 2.54);
                     }
 
                     // Komponist paragraph - bold, left-aligned
-                    sb.AppendLine($@"\pard\ql\f0\fs20\b {EscapeRtf(record._komponist.OrderName)}\b0\sa100\par");
+                    sb.AppendLine($@"\pard\ql\f0\fs20\b {EscapeRtf(record.Komponist.Name)}\b0\sa100\par");
 
                     lastKomponist = record.Komponist;
                 }
 
                 // Details line: Werk (left), Dirigent (left), Date (right-aligned)
-                sb.AppendLine($@"\pard\ql\li256\fi0\f0\fs16 {EscapeRtf(record.Werk)}, {EscapeRtf(record.Dirigent)}\par");
+                sb.AppendLine($@"\pard\ql\li256\fi0\f0\fs16 {EscapeRtf(record.Werk)}, {EscapeRtf(record.Dirigent.Name)}\par");
 
                 // Line 2: Date fully right-aligned (no tab)
                 sb.AppendLine($@"\pard\qr\f0\fs16 {EscapeRtf(ShortDate(record.Datum))}\par\par");
             }
         }
-        private void ExportDirigentenToRtf(List<MusicRecord> records, StringBuilder sb, List<IGrouping<string, MusicRecord>> topDirigenten)
+        private void ExportDirigentenToRtf(List<RtfRecord> records, StringBuilder sb, List<IGrouping<string, RtfRecord>> topDirigenten)
         {
             var sorted = records
-                .OrderBy(r => r._dirigent.OrderName)
+                .OrderBy(r => r.Dirigent.Name)
                 .ThenBy(r => r.Komponist)
                 .ThenBy(r => r.Werk)
                 .ThenBy(r => DateTime.TryParse(r.Datum, out var dt) ? dt : DateTime.MinValue)
@@ -151,45 +151,45 @@ namespace DbToRtf
             AppendImageToRtf(sb, "Dirigenten.jpg", "Dirigenten", list, w, h, false);
 
 
-            string? lastDirigent = null;
+            Person lastDirigent = new();
             foreach (var record in sorted)
             {
-                if (string.IsNullOrWhiteSpace(record.Komponist) ||
-                    string.IsNullOrWhiteSpace(record.Dirigent) ||
+                if (string.IsNullOrWhiteSpace(record.Komponist.Name) ||
+                    string.IsNullOrWhiteSpace(record.Dirigent.Name) ||
                     string.IsNullOrWhiteSpace(record.Werk))
                     continue;
 
-                if (record.Komponist.Contains("div.", StringComparison.CurrentCultureIgnoreCase) ||
+                if (record.Komponist.Name.Contains("div.", StringComparison.CurrentCultureIgnoreCase) ||
                    record.Werk.Contains("div.", StringComparison.CurrentCultureIgnoreCase) ||
                    record.Werk.Contains("divers", StringComparison.CurrentCultureIgnoreCase) ||
-                   record.Dirigent.Equals("-", StringComparison.CurrentCultureIgnoreCase))
+                   record.Dirigent.Name.Equals("-", StringComparison.CurrentCultureIgnoreCase))
                     continue;
 
-                if (record.Dirigent != lastDirigent)
+                if (record.Dirigent.Name != lastDirigent.Name)
                 {
                     lastDirigent = record.Dirigent;
 
-                    if (topDirigenten.Any(g => g.Key.Equals(record.Dirigent, StringComparison.OrdinalIgnoreCase)))
+                    if (topDirigenten.Any(g => g.Key.Equals(record.Dirigent.Name, StringComparison.OrdinalIgnoreCase)))
                     {
                         // insert a picture
-                        AppendImageToRtf(sb, record.Dirigent + ".jpg", record.Dirigent, null, (9 * 1440) / 2.54);
+                        AppendImageToRtf(sb, record.Dirigent + ".jpg", record.Dirigent.Name, null, (9 * 1440) / 2.54);
                     }
                     else
                     {
                         if (lastDirigent != null)
                             sb.AppendLine(@"\par");
                     }
-                    sb.AppendLine($@"\pard\ql\f0\fs20\b {EscapeRtf(record._dirigent.OrderName)}\b0\sa100\par");
+                    sb.AppendLine($@"\pard\ql\f0\fs20\b {EscapeRtf(record.Dirigent.Name)}\b0\sa100\par");
                 }
 
                 // Details line: Werk (left), Dirigent (left), Date (right-aligned)
-                sb.AppendLine($@"\pard\ql\li256\fi0\f0\fs16 {EscapeRtf(record.Werk)}, {EscapeRtf(record.Komponist)}\par");
+                sb.AppendLine($@"\pard\ql\li256\fi0\f0\fs16 {EscapeRtf(record.Werk)}, {EscapeRtf(record.Komponist.Name)}\par");
 
                 // Line 2: Date fully right-aligned (no tab)
                 sb.AppendLine($@"\pard\qr\f0\fs16 {EscapeRtf(ShortDate(record.Datum))}\par\par");
             }
         }
-        private void ExportImpressionenToRtf(List<MusicRecord> records, StringBuilder sb)
+        private void ExportImpressionenToRtf(List<RtfRecord> records, StringBuilder sb)
         {
             var sorted = records
                 .Where(r => !string.IsNullOrWhiteSpace(r.Datum))
@@ -202,7 +202,7 @@ namespace DbToRtf
 
             foreach (var r in sorted)
             {
-                if (string.IsNullOrWhiteSpace(r.Werk) && string.IsNullOrWhiteSpace(r.Bewertung1))
+                if (string.IsNullOrWhiteSpace(r.Werk) && string.IsNullOrWhiteSpace(r.Bewertung))
                     continue;
 
                 if (lastSpielSaison != r.Spielsaison && !string.IsNullOrEmpty(r.Spielsaison))
@@ -227,20 +227,20 @@ namespace DbToRtf
 
 
                 // Line 2: Werk, Komponist
-                if (!string.IsNullOrEmpty(r.Werk) && !string.IsNullOrEmpty(r.Komponist))
-                    sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Werk)}, {EscapeRtf(r.Komponist)}\b0\par");
+                if (!string.IsNullOrEmpty(r.Werk) && !string.IsNullOrEmpty(r.Komponist.Name))
+                    sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Werk)}, {EscapeRtf(r.Komponist.Name)}\b0\par");
                 else
                     if (!string.IsNullOrEmpty(r.Werk))
-                        sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Komponist)}\b0\par");
+                        sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Komponist.Name)}\b0\par");
                 else
                     sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Werk)}\b0\par");
 
                 // Line 3: Dirigent
-                if (!string.IsNullOrEmpty(r.Dirigent))
-                    sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\i {EscapeRtf(r.Dirigent)}\i0\sa50\par");
+                if (!string.IsNullOrEmpty(r.Dirigent.Name))
+                    sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\i {EscapeRtf(r.Dirigent.Name)}\i0\sa50\par");
 
                 // Line 4: Bewertung1 (comment)
-                sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16 {EscapeRtf(r.Bewertung1)}\par");
+                sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16 {EscapeRtf(r.Bewertung)}\par");
 
                 // Blank line after each record
                 sb.AppendLine(@"\par");

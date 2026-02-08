@@ -1,5 +1,7 @@
-﻿using Serilog;
+﻿using MaestroNotes.Data.Export;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
+
 
 namespace MaestroNotes.Data
 {
@@ -500,6 +502,17 @@ namespace MaestroNotes.Data
         //{
         //    // ... Deine existierende Dateilogik ...
         //}
+        public void ExportRtfAndSendEmail(DateOnly from, DateOnly to)
+        {
+            List<RtfRecord> records = new();
+            //ParseMusicRecords(content); from to
+            // Print the result (number of records parsed)
+            Console.WriteLine($"Parsed {records.Count} records.");
+
+            string rtfFilePath = "";//".rtf";
+            RtfExporter r = new(Directory.GetCurrentDirectory());
+            r.ExportToRtf(rtfFilePath, records);
+        }
 
     }
 }
