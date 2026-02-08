@@ -241,6 +241,9 @@ namespace MaestroNotes.Data
                 string fn = Path.Combine(path, document.EncryptedName);
                 if (await SaveDocuDataSet(document))
                 {
+                    if (!Directory.Exists(path))
+                        Directory.CreateDirectory(path);
+
                     Log.Logger.Information($"Save {fn}");
                     File.WriteAllBytes(fn, fileBytes);
                     return FileName + " gespeichert";
