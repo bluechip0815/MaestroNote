@@ -1,14 +1,18 @@
-﻿using Serilog;
+using Serilog;
 using Microsoft.EntityFrameworkCore;
+using MaestroNotes.Services;
 
 namespace MaestroNotes.Data
 {
     public class MusicService
     {
         private readonly MusicContext _context;
-        public MusicService(MusicContext context)
+        private readonly IEmailService _emailService;
+
+        public MusicService(MusicContext context, IEmailService emailService)
         {
             _context = context;
+            _emailService = emailService;
             try
             {
                 Log.Logger.Information("MusicService constructed");
@@ -18,12 +22,69 @@ namespace MaestroNotes.Data
                 Log.Logger.Error(ex.Message);
             }
         }
-        public AccessType EnablerTest(string pw)
+
+        // Authentication Methods
+        public async Task<bool> RequestLoginLink(string name)
         {
-            if (pw.Equals(_context.PasswordRO))
-                return AccessType.ReadOnly;
-            return pw.Equals(_context.PasswordRW) ? AccessType.ReadWrite : AccessType.None;
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == name);
+                if (user == null)
+                {
+                    Log.Information($"Login request for unknown user: {name}");
+                    return false;
+                }
+
+                var token = new LoginToken
+                {
+                    UserName = user.Name,
+                    Token = Guid.NewGuid(),
+                    CreatedAt = DateTime.UtcNow,
+                    IsUsed = false
+                };
+
+                _context.LoginTokens.Add(token);
+                await _context.SaveChangesAsync();
+
+                await _emailService.SendLoginLink(user.Email, token.Token.ToString());
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error in RequestLoginLink");
+                return false;
+            }
         }
+
+        public async Task<User?> VerifyLoginToken(string tokenStr)
+        {
+            if (!Guid.TryParse(tokenStr, out Guid tokenGuid))
+                return null;
+
+            try
+            {
+                var token = await _context.LoginTokens
+                    .FirstOrDefaultAsync(t => t.Token == tokenGuid && !t.IsUsed);
+
+                if (token == null)
+                    return null;
+
+                if (token.CreatedAt < DateTime.UtcNow.AddDays(-30))
+                    return null; // Expired
+
+                token.IsUsed = true;
+                await _context.SaveChangesAsync();
+
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == token.UserName);
+                return user;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error in VerifyLoginToken");
+                return null;
+            }
+        }
+
         public List<MusicRecord> GetAllMusicRecords()
         {
             return _context.MusicRecords.ToList();
@@ -305,11 +366,6 @@ namespace MaestroNotes.Data
             return _context is not null ? _context.ImagesPath : "";
         }
         // --- GENERISCHE METHODEN FÜR EINFACHE ENTITÄTEN ---
-        // Holt alle Einträge einer beliebigen Klasse (z.B. Komponisten)
-        //public async Task<List<T>> GetAllAsync<T>() where T : class
-        //{
-        //    return await _context.Set<T>().ToListAsync();
-        //}
 
         // Findet einen Eintrag per ID
         public async Task<T?> GetByIdAsync<T>(int id) where T : class
@@ -490,13 +546,5 @@ namespace MaestroNotes.Data
         {
             return GetSpielSaisonList();
         }
-
-        // --- SPEZIFISCHE LOGIK (Bleibt wie sie ist) ---
-
-        //public async Task<string> SaveFile(int pid, string FileName, byte[] fileBytes, DocumentType type)
-        //{
-        //    // ... Deine existierende Dateilogik ...
-        //}
-
     }
 }

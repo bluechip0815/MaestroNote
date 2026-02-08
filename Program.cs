@@ -1,5 +1,8 @@
 using MaestroNotes.Data;
 using MaestroNotes.Data.Ai;
+using MaestroNotes.Services;
+using MaestroNotes.Auth;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -15,9 +18,17 @@ builder.Services.AddServerSideBlazor();
 builder.Services.Configure<AiSettings>(builder.Configuration.GetSection("AiSettings"));
 
 string? connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-string? serverVersion = builder.Configuration.GetConnectionString("ServerVersion");
+// string? serverVersion = builder.Configuration.GetConnectionString("ServerVersion"); // Unused
 builder.Services.AddDbContext<MusicContext>(option => option.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 38))));
+
+// Register Email Service
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+// Register Music Service
 builder.Services.AddScoped<MusicService>();
+
+// Register Authentication
+builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
 
 // Register AI Service and Provider
 builder.Services.AddScoped<AiService>();
@@ -57,20 +68,33 @@ app.MapFallbackToPage("/_Host");
 
 Log.Information("Starting web host");
 
-// Perform data migration
-//using (var scope = app.Services.CreateScope())
-//{
-//    var services = scope.ServiceProvider;
-//    try
-//    {
-//        var context = services.GetRequiredService<MusicContext>();
-//        DataMigrationService.MigrateData(context);
-//    }
-//    catch (Exception ex)
-//    {
-//        Log.Error(ex, "An error occurred during data migration.");
-//    }
-//}
+// Perform data migration / Ensure DB creation
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<MusicContext>();
+        context.Database.EnsureCreated();
+
+        // Seed initial admin user if no users exist
+        if (!context.Users.Any())
+        {
+            context.Users.Add(new User
+            {
+                Name = "Admin",
+                Email = "admin@example.com",
+                UserLevel = UserLevel.Admin
+            });
+            context.SaveChanges();
+            Log.Information("Seeded default Admin user.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "An error occurred during database initialization.");
+    }
+}
 
 app.Run();
 

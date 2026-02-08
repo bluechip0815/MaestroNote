@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace MaestroNotes.Data
 {
@@ -12,22 +12,34 @@ namespace MaestroNotes.Data
         public DbSet<Orchester> Orchester { get; set; }
         public DbSet<Werk> Werke { get; set; }
         public DbSet<Ort> Orte { get; set; }
+        public DbSet<User> Users { get; set; }
+        public DbSet<LoginToken> LoginTokens { get; set; }
 
         public string DocumentsPath { get; set; } = "";
         public string ImagesPath { get; set; } = "";
-        public string PasswordRO { get; set; } = "";
-        public string PasswordRW { get; set; } = "";
+
         public MusicContext(DbContextOptions<MusicContext> options, IConfiguration cfg) : base(options)
         {
             DocumentsPath = cfg.GetValue<string>("Documents") ?? "";
             ImagesPath = cfg.GetValue<string>("Images") ?? "";
-            PasswordRO = cfg.GetValue<string>("Password") ?? "Gast";
-            PasswordRW = cfg.GetValue<string>("Password-Write") ?? "Nilsau";
         }
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             base.OnConfiguring(optionsBuilder);
         }
 
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Name)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
+
+            base.OnModelCreating(modelBuilder);
+        }
     }
 }

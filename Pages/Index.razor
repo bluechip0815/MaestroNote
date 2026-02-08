@@ -20,209 +20,207 @@
     </div>
 }
 
-@if (PageEnabled != AccessType.None)
-{
-    @if (EditMusicRecord is not null)
-    {
-        <h3>Bearbeiten</h3>
-        <Edit currentRecord="EditMusicRecord" CloseCallback="@CloseEdit" />
-    }
-    else
-    {
-        <div class="search-container" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 20px;">
-            <select class="form-select" style="width: auto;" @bind="searchCategory">
-                @foreach (var cat in searchCategories)
-                {
-                    <option value="@cat">@cat</option>
-                }
-            </select>
-
-            @if (searchCategory == "Datum")
-            {
-                <span class="date-search">
-                    <span>von</span>
-                    <input type="date" class="form-control" style="width: auto;" @bind="searchDateFrom" />
-                    <span>bis</span>
-                    <input type="date" class="form-control" style="width: auto;" @bind="searchDateTo" />
-                </span>
-            }
-            else if (searchCategory == "Note")
-            {
-                <input type="text" class="form-control" style="width: 200px;" @bind="searchTerm" placeholder="(* und ? möglich)" />
-            }
-            else
-            {
-                <select class="form-select" style="width: auto;" @bind="searchTerm">
-                    <option value="">Bitte wählen...</option>
-                    @if (searchCategory == "Werk")
+<AuthorizeView>
+    <Authorized>
+        @if (EditMusicRecord is not null)
+        {
+            <h3>Bearbeiten</h3>
+            <Edit currentRecord="EditMusicRecord" CloseCallback="@CloseEdit" />
+        }
+        else
+        {
+            <div class="search-container" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 20px;">
+                <select class="form-select" style="width: auto;" @bind="searchCategory">
+                    @foreach (var cat in searchCategories)
                     {
-                        @foreach (var item in availableWerke)
-                        {
-                            <option value="@item">@item</option>
-                        }
-                    }
-                    else if (searchCategory == "Komponist")
-                    {
-                        @foreach (var item in availableKomponisten)
-                        {
-                            <option value="@item">@item</option>
-                        }
-                    }
-                    else if (searchCategory == "Dirigent")
-                    {
-                        @foreach (var item in availableDirigenten)
-                        {
-                            <option value="@item">@item</option>
-                        }
-                    }
-                    else if (searchCategory == "Solist")
-                    {
-                        @foreach (var item in availableSolisten)
-                        {
-                            <option value="@item">@item</option>
-                        }
-                    }
-                    else if (searchCategory == "Orchester")
-                    {
-                        @foreach (var item in availableOrchester)
-                        {
-                            <option value="@item">@item</option>
-                        }
-                    }
-                    else if (searchCategory == "Ort")
-                    {
-                        @foreach (var item in availableOrte)
-                        {
-                            <option value="@item">@item</option>
-                        }
-                    }
-                    else if (searchCategory == "Saisson")
-                    {
-                        @foreach (var item in availableSaisons)
-                        {
-                            <option value="@item">@item</option>
-                        }
+                        <option value="@cat">@cat</option>
                     }
                 </select>
-            }
 
-            <button class="btn btn-secondary" @onclick="RefreshList">Zeige</button>
-
-            <span>@GetNumber() Datensätze</span>
-
-            <select id="number" value="@selectedLimit" @onchange="Display" class="form-select" style="width:auto;">
-                @foreach (var opt in limitOptions)
+                @if (searchCategory == "Datum")
                 {
-                    <option value="@opt.Key">@opt.Value</option>
+                    <span class="date-search">
+                        <span>von</span>
+                        <input type="date" class="form-control" style="width: auto;" @bind="searchDateFrom" />
+                        <span>bis</span>
+                        <input type="date" class="form-control" style="width: auto;" @bind="searchDateTo" />
+                    </span>
                 }
-            </select>
-            @if (PageEnabled == AccessType.ReadWrite)
-            {
-                <div class="dropdown d-inline-block me-2">
-                    <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMaster" data-bs-toggle="dropdown" aria-expanded="false">
-                        Stammdaten
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="dropdownMaster">
-                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Dirigent")'>Dirigent</a></li>
-                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Orchester")'>Orchester</a></li>
-                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Solist")'>Solist</a></li>
-                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Werk")'>Werk</a></li>
-                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Komponist")'>Komponist</a></li>
-                        <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Ort")'>Ort</a></li>
-                    </ul>
-                </div>
-                <button class="btn btn-primary" @onclick="() => AddNew()" title="Neuer Eintrag">
-                    <i class="fas fa-plus"></i>
-                </button>
-            }
-        </div>
+                else if (searchCategory == "Note")
+                {
+                    <input type="text" class="form-control" style="width: 200px;" @bind="searchTerm" placeholder="(* und ? möglich)" />
+                }
+                else
+                {
+                    <select class="form-select" style="width: auto;" @bind="searchTerm">
+                        <option value="">Bitte wählen...</option>
+                        @if (searchCategory == "Werk")
+                        {
+                            @foreach (var item in availableWerke)
+                            {
+                                <option value="@item">@item</option>
+                            }
+                        }
+                        else if (searchCategory == "Komponist")
+                        {
+                            @foreach (var item in availableKomponisten)
+                            {
+                                <option value="@item">@item</option>
+                            }
+                        }
+                        else if (searchCategory == "Dirigent")
+                        {
+                            @foreach (var item in availableDirigenten)
+                            {
+                                <option value="@item">@item</option>
+                            }
+                        }
+                        else if (searchCategory == "Solist")
+                        {
+                            @foreach (var item in availableSolisten)
+                            {
+                                <option value="@item">@item</option>
+                            }
+                        }
+                        else if (searchCategory == "Orchester")
+                        {
+                            @foreach (var item in availableOrchester)
+                            {
+                                <option value="@item">@item</option>
+                            }
+                        }
+                        else if (searchCategory == "Ort")
+                        {
+                            @foreach (var item in availableOrte)
+                            {
+                                <option value="@item">@item</option>
+                            }
+                        }
+                        else if (searchCategory == "Saisson")
+                        {
+                            @foreach (var item in availableSaisons)
+                            {
+                                <option value="@item">@item</option>
+                            }
+                        }
+                    </select>
+                }
 
-        <div class="table-responsive">
-            <table class="table table-hover align-middle modern-table">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 20%;">Komponist</th>
-                        <th style="width: 25%;">Werk</th>
-                        <th style="width: 20%;">Orchester / Dirigent</th>
-                        <th style="width: 15%;">Solist</th>
-                        <th style="width: 10%;">Saison</th>
-                        <th style="width: 10%;">Aktionen</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var record in MusicRecords)
+                <button class="btn btn-secondary" @onclick="RefreshList">Zeige</button>
+
+                <span>@GetNumber() Datensätze</span>
+
+                <select id="number" value="@selectedLimit" @onchange="Display" class="form-select" style="width:auto;">
+                    @foreach (var opt in limitOptions)
                     {
-                        <tr>
-                            <td class="fw-bold text-primary">@record.KomponistNames</td>
-                            <td>
-                                @if (!string.IsNullOrEmpty(record.Bezeichnung))
-                                {
-                                    <div class="small text-muted">@record.Bezeichnung</div>
-                                }
-                                <div class="fw-bold">@record.WerkNames</div>
-                            </td>
-                            <td>
-                                <div>@record.OrchesterName</div>
-                                <div class="text-muted small">@record.DirigentName</div>
-                            </td>
-                            <td class="small">@record.SolistNames</td>
-                            <td class="small text-muted">@record.Spielsaison</td>
-                            <td>
-                                <div class="dropdown">
-                                    <button class="btn btn-link text-dark dropdown-toggle" type="button" id="dropdownMenuButton-@record.Id" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-@record.Id">
-                                        <li>
-                                            <a class="dropdown-item" role="button" @onclick="() => OpenNoteModal(record)">
-                                                <i class="fas fa-envelope me-2 text-warning"></i> Note
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" role="button" @onclick="() => OpenDetailsModal(record)">
-                                                <i class="fas fa-info-circle me-2 text-info"></i> Details
-                                            </a>
-                                        </li>
-                                        @if (PageEnabled == AccessType.ReadWrite)
-                                        {
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
-                                                    <i class="fas fa-upload me-2 text-success"></i> Upload
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item" role="button" @onclick="() => Edit(record.Id)">
-                                                    <i class="fas fa-edit me-2 text-primary"></i> Bearbeiten
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item text-danger" role="button" @onclick="() => OpenDeleteModal(record)">
-                                                    <i class="fas fa-trash me-2"></i> Löschen
-                                                </a>
-                                            </li>
-                                        }
-                                    </ul>
-                                </div>
-                            </td>
-                        </tr>
+                        <option value="@opt.Key">@opt.Value</option>
                     }
-                </tbody>
-            </table>
+                </select>
+
+                <AuthorizeView Roles="Admin" Context="adminContext">
+                    <div class="dropdown d-inline-block me-2">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMaster" data-bs-toggle="dropdown" aria-expanded="false">
+                            Stammdaten
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="dropdownMaster">
+                            <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Dirigent")'>Dirigent</a></li>
+                            <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Orchester")'>Orchester</a></li>
+                            <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Solist")'>Solist</a></li>
+                            <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Werk")'>Werk</a></li>
+                            <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Komponist")'>Komponist</a></li>
+                            <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Ort")'>Ort</a></li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-primary" @onclick="() => AddNew()" title="Neuer Eintrag">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </AuthorizeView>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle modern-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 20%;">Komponist</th>
+                            <th style="width: 25%;">Werk</th>
+                            <th style="width: 20%;">Orchester / Dirigent</th>
+                            <th style="width: 15%;">Solist</th>
+                            <th style="width: 10%;">Saison</th>
+                            <th style="width: 10%;">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var record in MusicRecords)
+                        {
+                            <tr>
+                                <td class="fw-bold text-primary">@record.KomponistNames</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(record.Bezeichnung))
+                                    {
+                                        <div class="small text-muted">@record.Bezeichnung</div>
+                                    }
+                                    <div class="fw-bold">@record.WerkNames</div>
+                                </td>
+                                <td>
+                                    <div>@record.OrchesterName</div>
+                                    <div class="text-muted small">@record.DirigentName</div>
+                                </td>
+                                <td class="small">@record.SolistNames</td>
+                                <td class="small text-muted">@record.Spielsaison</td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-link text-dark dropdown-toggle" type="button" id="dropdownMenuButton-@record.Id" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-@record.Id">
+                                            <li>
+                                                <a class="dropdown-item" role="button" @onclick="() => OpenNoteModal(record)">
+                                                    <i class="fas fa-envelope me-2 text-warning"></i> Note
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" role="button" @onclick="() => OpenDetailsModal(record)">
+                                                    <i class="fas fa-info-circle me-2 text-info"></i> Details
+                                                </a>
+                                            </li>
+
+                                            <AuthorizeView Roles="Admin" Context="adminItemContext">
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
+                                                        <i class="fas fa-upload me-2 text-success"></i> Upload
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item" role="button" @onclick="() => Edit(record.Id)">
+                                                        <i class="fas fa-edit me-2 text-primary"></i> Bearbeiten
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item text-danger" role="button" @onclick="() => OpenDeleteModal(record)">
+                                                        <i class="fas fa-trash me-2"></i> Löschen
+                                                    </a>
+                                                </li>
+                                            </AuthorizeView>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <div class="text-center mt-5">
+            <h3 class="mb-4">Meine Konzerte</h3>
+            <p> <img src="Images/dresden.jpg" class="img-fluid rounded shadow" style="max-height: 500px;" /> </p>
+            <p class="mt-4">Bitte melden Sie sich an, um auf die Konzertdatenbank zuzugreifen.</p>
+            <a href="/login" class="btn btn-primary btn-lg mt-2">Zum Login</a>
         </div>
-    }
-}
-else
-{
-    <div class="text-center mt-5">
-        <h3 class="mb-4">Meine Konzerte</h3>
-        <p> <img src="Images/dresden.jpg" class="img-fluid rounded shadow" style="max-height: 500px;" /> </p>
-        <div class="form-group mt-3 d-inline-block">
-            <label class="me-2">Logon:</label>
-            <input type="text" @oninput="PageEnabler" id="EnablePage" class="form-control d-inline-block" style="width: 100px;" />
-        </div>
-    </div>
-}
+    </NotAuthorized>
+</AuthorizeView>
 
 @* --- Modals --- *@
 
@@ -265,12 +263,11 @@ else
                         <a href="@item.path" target="_blank" class="text-decoration-none">
                             <i class="fas fa-file-pdf me-2 text-danger"></i> @item.fn
                         </a>
-                        @if (PageEnabled == AccessType.ReadWrite)
-                        {
+                        <AuthorizeView Roles="Admin" Context="docAdmin">
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                 <i class="fas fa-trash"></i>
                             </button>
-                        }
+                        </AuthorizeView>
                     </div>
                 }
 
@@ -281,12 +278,11 @@ else
                         <img src="@item.path" alt="@item.fn" class="img-fluid mb-2" />
                         <div class="d-flex justify-content-between">
                              <span class="text-muted small">@item.fn</span>
-                             @if (PageEnabled == AccessType.ReadWrite)
-                             {
+                             <AuthorizeView Roles="Admin" Context="imgAdmin">
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                     <i class="fas fa-trash"></i>
                                 </button>
-                             }
+                             </AuthorizeView>
                         </div>
                     </div>
                 }
@@ -575,18 +571,33 @@ else
 
     private List<MusicRecordDisplayDto> MusicRecords = new();
 
-    protected override void OnInitialized()
-    {
-        // Load lists
-        availableWerke = Service.GetUsedWerkeNames();
-        availableKomponisten = Service.GetUsedKomponistenNames();
-        availableDirigenten = Service.GetUsedDirigentenNames();
-        availableSolisten = Service.GetUsedSolistenNames();
-        availableOrchester = Service.GetUsedOrchesterNames();
-        availableOrte = Service.GetUsedOrte();
-        availableSaisons = Service.GetUsedSaisons();
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
 
-        RefreshList();
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateTask;
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            try
+            {
+                // Load lists
+                availableWerke = Service.GetUsedWerkeNames();
+                availableKomponisten = Service.GetUsedKomponistenNames();
+                availableDirigenten = Service.GetUsedDirigentenNames();
+                availableSolisten = Service.GetUsedSolistenNames();
+                availableOrchester = Service.GetUsedOrchesterNames();
+                availableOrte = Service.GetUsedOrte();
+                availableSaisons = Service.GetUsedSaisons();
+
+                RefreshList();
+            }
+            catch (Exception ex)
+            {
+                // Log error or handle gracefully
+                Console.WriteLine($"Error loading data: {ex.Message}");
+            }
+        }
     }
 
     private void RefreshList()
@@ -606,20 +617,6 @@ else
     private string GetNumber()
     {
         return MusicRecords.Count.ToString();
-    }
-
-    private AccessType PageEnabled = AccessType.None;
-    void PageEnabler(ChangeEventArgs eventArgs)
-    {
-        if (eventArgs != null)
-        {
-            var t = eventArgs.Value?.ToString() ?? string.Empty;
-            if (t.Length >= 4)
-            {
-                PageEnabled = Service.EnablerTest(t);
-                StateHasChanged();
-            }
-        }
     }
 
     // --- Modal State Management ---
