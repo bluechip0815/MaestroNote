@@ -58,19 +58,19 @@ app.MapFallbackToPage("/_Host");
 Log.Information("Starting web host");
 
 // Perform data migration
-//using (var scope = app.Services.CreateScope())
-//{
-//    var services = scope.ServiceProvider;
-//    try
-//    {
-//        var context = services.GetRequiredService<MusicContext>();
-//        DataMigrationService.MigrateData(context);
-//    }
-//    catch (Exception ex)
-//    {
-//        Log.Error(ex, "An error occurred during data migration.");
-//    }
-//}
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<MusicContext>();
+        DataMigrationService.MigrateData(context);
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "An error occurred during data migration.");
+    }
+}
 
 app.Run();
 
