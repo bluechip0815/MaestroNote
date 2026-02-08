@@ -147,6 +147,7 @@
                         <th style="width: 15%;">Solist</th>
                         <th style="width: 10%;">Saison</th>
                         <th style="width: 10%;">Aktionen</th>
+                        <th class="d-md-none">Bilder</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -204,6 +205,26 @@
                                         }
                                     </ul>
                                 </div>
+                            </td>
+                            <td class="d-md-none mobile-images">
+                                @if (record.HasImages)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary w-100 mb-2" @onclick="() => ToggleImages(record)">
+                                        @(record.ShowImages ? "Bilder verbergen" : "Bilder anzeigen")
+                                    </button>
+                                    @if (record.ShowImages)
+                                    {
+                                        <div class="image-gallery mt-2">
+                                            @foreach (var img in record.Images)
+                                            {
+                                                <div class="mb-2">
+                                                    <img src="@img.path" alt="@img.fn" class="img-fluid rounded shadow-sm" style="max-width: 100%;" />
+                                                    <div class="text-muted small">@img.fn</div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                }
                             </td>
                         </tr>
                     }
@@ -960,5 +981,15 @@ else
             // Refresh main list as names might have changed
             RefreshList();
         }
+    }
+
+    private void ToggleImages(MusicRecordDisplayDto record)
+    {
+        if (!record.ImagesLoaded)
+        {
+            record.Images = Service.GetImages(record.Id);
+            record.ImagesLoaded = true;
+        }
+        record.ShowImages = !record.ShowImages;
     }
 }
