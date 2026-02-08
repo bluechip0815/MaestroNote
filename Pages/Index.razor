@@ -248,10 +248,19 @@ else
         {
             <div class="mb-3">
                 <h5>@DetailsRecord.KomponistNames: @DetailsRecord.WerkNames</h5>
-                <p>
-                    <strong>Ort:</strong> @DetailsRecord.Ort <br />
-                    <strong>Datum:</strong> @DetailsRecord.Datum.ToString("dd.MM.yyyy")
-                </p>
+                <div class="small">
+                    <strong>Ort:</strong> @DetailsRecord.Ort |
+                    <strong>Datum:</strong> @DetailsRecord.Datum.ToString("dd.MM.yyyy") |
+                    <strong>Dirigent:</strong> @DetailsRecord.DirigentName
+                </div>
+
+                @if (!string.IsNullOrEmpty(DetailsRecord.Bewertung))
+                {
+                    <div class="mt-2 p-2 border rounded bg-light small" style="max-height: 100px; overflow-y: auto;">
+                        <strong>Bemerkung:</strong><br />
+                        @DetailsRecord.Bewertung
+                    </div>
+                }
             </div>
 
             <hr />
