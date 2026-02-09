@@ -1,0 +1,94 @@
+@page "/login"
+@using MaestroNotes.Data
+@inject MusicService Service
+@inject NavigationManager Nav
+
+<PageTitle>Login</PageTitle>
+
+<div class="container mt-5" style="max-width: 500px;">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">Maestro Notes Login</h4>
+        </div>
+        <div class="card-body">
+            @if (sent)
+            {
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Magic Link wurde an Ihre E-Mail-Adresse gesendet.
+                    <br/>
+                    Bitte prüfen Sie Ihren Posteingang.
+                </div>
+                <button class="btn btn-outline-primary w-100" @onclick="() => sent = false">Zurück</button>
+            }
+            else
+            {
+                <p>Bitte geben Sie Ihren Benutzernamen ein, um einen Anmeldelink zu erhalten.</p>
+                <div class="mb-3">
+                    <label for="usernameInput" class="form-label">Benutzername</label>
+                    <input id="usernameInput" class="form-control" @bind="username" placeholder="Name" @onkeyup="HandleKeyUp" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i> @error
+                    </div>
+                }
+
+                <button class="btn btn-primary w-100" @onclick="RequestLink" disabled="@isBusy">
+                    @if (isBusy)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Link anfordern
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string username = "";
+    private bool sent = false;
+    private string error = "";
+    private bool isBusy = false;
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await RequestLink();
+        }
+    }
+
+    private async Task RequestLink()
+    {
+        if (isBusy) return;
+        isBusy = true;
+        error = "";
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                error = "Bitte Benutzername eingeben.";
+                return;
+            }
+
+            bool success = await Service.RequestLoginLink(username);
+            if (success)
+            {
+                sent = true;
+            }
+            else
+            {
+                error = "Benutzer nicht gefunden oder Fehler beim Senden.";
+            }
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

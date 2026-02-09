@@ -1,16 +1,18 @@
-﻿using MaestroNotes.Data.Export;
-using Microsoft.EntityFrameworkCore;
 using Serilog;
-
+using Microsoft.EntityFrameworkCore;
+using MaestroNotes.Services;
 
 namespace MaestroNotes.Data
 {
     public class MusicService
     {
         private readonly MusicContext _context;
-        public MusicService(MusicContext context)
+        private readonly IEmailService _emailService;
+
+        public MusicService(MusicContext context, IEmailService emailService)
         {
             _context = context;
+            _emailService = emailService;
             try
             {
                 Log.Logger.Information("MusicService constructed");
@@ -20,12 +22,69 @@ namespace MaestroNotes.Data
                 Log.Logger.Error(ex.Message);
             }
         }
-        public AccessType EnablerTest(string pw)
+
+        // Authentication Methods
+        public async Task<bool> RequestLoginLink(string name)
         {
-            if (pw.Equals(_context.PasswordRO))
-                return AccessType.ReadOnly;
-            return pw.Equals(_context.PasswordRW) ? AccessType.ReadWrite : AccessType.None;
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == name);
+                if (user == null)
+                {
+                    Log.Information($"Login request for unknown user: {name}");
+                    return false;
+                }
+
+                var token = new LoginToken
+                {
+                    UserName = user.Name,
+                    Token = Guid.NewGuid(),
+                    CreatedAt = DateTime.UtcNow,
+                    IsUsed = false
+                };
+
+                _context.LoginTokens.Add(token);
+                await _context.SaveChangesAsync();
+
+                await _emailService.SendLoginLink(user.Email, token.Token.ToString());
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error in RequestLoginLink");
+                return false;
+            }
         }
+
+        public async Task<User?> VerifyLoginToken(string tokenStr)
+        {
+            if (!Guid.TryParse(tokenStr, out Guid tokenGuid))
+                return null;
+
+            try
+            {
+                var token = await _context.LoginTokens
+                    .FirstOrDefaultAsync(t => t.Token == tokenGuid && !t.IsUsed);
+
+                if (token == null)
+                    return null;
+
+                if (token.CreatedAt < DateTime.UtcNow.AddDays(-30))
+                    return null; // Expired
+
+                token.IsUsed = true;
+                await _context.SaveChangesAsync();
+
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == token.UserName);
+                return user;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error in VerifyLoginToken");
+                return null;
+            }
+        }
+
         public List<MusicRecord> GetAllMusicRecords()
         {
             return _context.MusicRecords.ToList();
@@ -98,14 +157,6 @@ namespace MaestroNotes.Data
 
             var entities = query.ToList();
 
-            // Fetch IDs of records that have images
-            var entityIds = entities.Select(e => e.Id).ToList();
-            var imageRecordIds = _context.Documents
-                .Where(d => d.DocumentType == DocumentType.Image && entityIds.Contains(d.MusicRecordId))
-                .Select(d => d.MusicRecordId)
-                .Distinct()
-                .ToHashSet();
-
             return entities.Select(m => new MusicRecordDisplayDto
             {
                 Id = m.Id,
@@ -118,8 +169,7 @@ namespace MaestroNotes.Data
                 WerkNames = string.Join(", ", m.Werke.Select(w => w.Name)),
                 OrchesterName = m.Orchester?.Name ?? "",
                 DirigentName = m.Dirigent?.Name ?? "",
-                SolistNames = string.Join(", ", m.Solisten.Select(s => s.Name)),
-                HasImages = imageRecordIds.Contains(m.Id)
+                SolistNames = string.Join(", ", m.Solisten.Select(s => s.Name))
             }).ToList();
         }
 
@@ -252,9 +302,6 @@ namespace MaestroNotes.Data
                 string fn = Path.Combine(path, document.EncryptedName);
                 if (await SaveDocuDataSet(document))
                 {
-                    if (!Directory.Exists(path))
-                        Directory.CreateDirectory(path);
-
                     Log.Logger.Information($"Save {fn}");
                     File.WriteAllBytes(fn, fileBytes);
                     return FileName + " gespeichert";
@@ -319,11 +366,6 @@ namespace MaestroNotes.Data
             return _context is not null ? _context.ImagesPath : "";
         }
         // --- GENERISCHE METHODEN FÜR EINFACHE ENTITÄTEN ---
-        // Holt alle Einträge einer beliebigen Klasse (z.B. Komponisten)
-        //public async Task<List<T>> GetAllAsync<T>() where T : class
-        //{
-        //    return await _context.Set<T>().ToListAsync();
-        //}
 
         // Findet einen Eintrag per ID
         public async Task<T?> GetByIdAsync<T>(int id) where T : class
@@ -375,12 +417,12 @@ namespace MaestroNotes.Data
         public List<Ort> GetAllOrte() => _context.Orte.ToList();
 
         // NoTracking variants for Master Data Management to avoid context tracking conflicts
-        public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().OrderBy(o=>o.Name).ToList();
-        public List<Werk> GetAllWerkeNoTracking() => _context.Werke.Include(w => w.Komponist).AsNoTracking().OrderBy(o => o.Name).ToList();
-        public List<Orchester> GetAllOrchesterNoTracking() => _context.Orchester.AsNoTracking().OrderBy(o => o.Name).ToList();
-        public List<Dirigent> GetAllDirigentenNoTracking() => _context.Dirigenten.AsNoTracking().OrderBy(o => o.Name).ToList();
-        public List<Solist> GetAllSolistenNoTracking() => _context.Solisten.AsNoTracking().OrderBy(o => o.Name).ToList();
-        public List<Ort> GetAllOrteNoTracking() => _context.Orte.AsNoTracking().OrderBy(o=>o.Name).ToList();
+        public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().ToList();
+        public List<Werk> GetAllWerkeNoTracking() => _context.Werke.Include(w => w.Komponist).AsNoTracking().ToList();
+        public List<Orchester> GetAllOrchesterNoTracking() => _context.Orchester.AsNoTracking().ToList();
+        public List<Dirigent> GetAllDirigentenNoTracking() => _context.Dirigenten.AsNoTracking().ToList();
+        public List<Solist> GetAllSolistenNoTracking() => _context.Solisten.AsNoTracking().ToList();
+        public List<Ort> GetAllOrteNoTracking() => _context.Orte.AsNoTracking().ToList();
 
         public async Task AddKomponist(Komponist k)
         {
@@ -504,24 +546,5 @@ namespace MaestroNotes.Data
         {
             return GetSpielSaisonList();
         }
-
-        // --- SPEZIFISCHE LOGIK (Bleibt wie sie ist) ---
-
-        //public async Task<string> SaveFile(int pid, string FileName, byte[] fileBytes, DocumentType type)
-        //{
-        //    // ... Deine existierende Dateilogik ...
-        //}
-        public void ExportRtfAndSendEmail(DateOnly from, DateOnly to)
-        {
-            List<RtfRecord> records = new();
-            //ParseMusicRecords(content); from to
-            // Print the result (number of records parsed)
-            Console.WriteLine($"Parsed {records.Count} records.");
-
-            string rtfFilePath = "";//".rtf";
-            RtfExporter r = new(Directory.GetCurrentDirectory());
-            r.ExportToRtf(rtfFilePath, records);
-        }
-
     }
 }
