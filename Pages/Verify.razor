@@ -1,4 +1,4 @@
-@page "/verify/{Token}"
+@page "/verify"
 @using MaestroNotes.Data
 @using MaestroNotes.Auth
 @using Microsoft.AspNetCore.Components.Authorization
@@ -29,6 +29,7 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "token")]
     [Parameter]
     public string? Token { get; set; }
 
