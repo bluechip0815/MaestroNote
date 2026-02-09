@@ -572,30 +572,33 @@
     private List<MusicRecordDisplayDto> MusicRecords = new();
 
     [CascadingParameter]
-    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthenticationStateTask;
-        if (authState.User.Identity?.IsAuthenticated == true)
+        if (AuthenticationStateTask != null)
         {
-            try
+            var authState = await AuthenticationStateTask;
+            if (authState.User.Identity?.IsAuthenticated == true)
             {
-                // Load lists
-                availableWerke = Service.GetUsedWerkeNames();
-                availableKomponisten = Service.GetUsedKomponistenNames();
-                availableDirigenten = Service.GetUsedDirigentenNames();
-                availableSolisten = Service.GetUsedSolistenNames();
-                availableOrchester = Service.GetUsedOrchesterNames();
-                availableOrte = Service.GetUsedOrte();
-                availableSaisons = Service.GetUsedSaisons();
+                try
+                {
+                    // Load lists
+                    availableWerke = Service.GetUsedWerkeNames();
+                    availableKomponisten = Service.GetUsedKomponistenNames();
+                    availableDirigenten = Service.GetUsedDirigentenNames();
+                    availableSolisten = Service.GetUsedSolistenNames();
+                    availableOrchester = Service.GetUsedOrchesterNames();
+                    availableOrte = Service.GetUsedOrte();
+                    availableSaisons = Service.GetUsedSaisons();
 
-                RefreshList();
-            }
-            catch (Exception ex)
-            {
-                // Log error or handle gracefully
-                Console.WriteLine($"Error loading data: {ex.Message}");
+                    RefreshList();
+                }
+                catch (Exception ex)
+                {
+                    // Log error or handle gracefully
+                    Console.WriteLine($"Error loading data: {ex.Message}");
+                }
             }
         }
     }
