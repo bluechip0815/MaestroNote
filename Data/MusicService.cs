@@ -64,7 +64,7 @@ namespace MaestroNotes.Data
             try
             {
                 var token = await _context.LoginTokens
-                    .FirstOrDefaultAsync(t => t.Token == tokenGuid && !t.IsUsed);
+                    .FirstOrDefaultAsync(t => t.Token == tokenGuid);
 
                 if (token == null)
                     return null;
