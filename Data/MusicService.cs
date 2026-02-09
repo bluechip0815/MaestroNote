@@ -98,6 +98,14 @@ namespace MaestroNotes.Data
 
             var entities = query.ToList();
 
+            // Fetch IDs of records that have images
+            var entityIds = entities.Select(e => e.Id).ToList();
+            var imageRecordIds = _context.Documents
+                .Where(d => d.DocumentType == DocumentType.Image && entityIds.Contains(d.MusicRecordId))
+                .Select(d => d.MusicRecordId)
+                .Distinct()
+                .ToHashSet();
+
             return entities.Select(m => new MusicRecordDisplayDto
             {
                 Id = m.Id,
@@ -110,7 +118,8 @@ namespace MaestroNotes.Data
                 WerkNames = string.Join(", ", m.Werke.Select(w => w.Name)),
                 OrchesterName = m.Orchester?.Name ?? "",
                 DirigentName = m.Dirigent?.Name ?? "",
-                SolistNames = string.Join(", ", m.Solisten.Select(s => s.Name))
+                SolistNames = string.Join(", ", m.Solisten.Select(s => s.Name)),
+                HasImages = imageRecordIds.Contains(m.Id)
             }).ToList();
         }
 

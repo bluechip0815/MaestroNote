@@ -1,3 +1,5 @@
+using static MaestroNotes.Data.MusicService;
+
 namespace MaestroNotes.Data
 {
     public class MusicRecordDisplayDto
@@ -14,5 +16,11 @@ namespace MaestroNotes.Data
         public string OrchesterName { get; set; } = "";
         public string DirigentName { get; set; } = "";
         public string SolistNames { get; set; } = "";
+
+        // Image Management
+        public bool HasImages { get; set; } = false;
+        public bool ShowImages { get; set; } = false;
+        public bool ImagesLoaded { get; set; } = false;
+        public List<DOC> Images { get; set; } = new();
     }
 }
