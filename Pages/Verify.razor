@@ -1,4 +1,4 @@
-@page "/verify"
+@page "/verify/{Token}"
 @using MaestroNotes.Data
 @using MaestroNotes.Auth
 @using Microsoft.AspNetCore.Components.Authorization
@@ -29,42 +29,35 @@
 </div>
 
 @code {
-    [SupplyParameterFromQuery(Name = "token")]
     [Parameter]
     public string? Token { get; set; }
 
     private bool error = false;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender)
+        if (string.IsNullOrEmpty(Token))
         {
-            if (string.IsNullOrEmpty(Token))
-            {
-                error = true;
-                StateHasChanged();
-                return;
-            }
+            error = true;
+            return;
+        }
 
-            var user = await Service.VerifyLoginToken(Token);
-            if (user != null)
+        var user = await Service.VerifyLoginToken(Token);
+        if (user != null)
+        {
+            if (AuthStateProvider is CustomAuthenticationStateProvider auth)
             {
-                if (AuthStateProvider is CustomAuthenticationStateProvider auth)
-                {
-                    auth.Login(user);
-                    Nav.NavigateTo("/");
-                }
-                else
-                {
-                    error = true;
-                    StateHasChanged();
-                }
+                auth.Login(user);
+                Nav.NavigateTo("/");
             }
             else
             {
-                error = true;
-                StateHasChanged();
+                error = true; // Should not happen if configured correctly
             }
+        }
+        else
+        {
+            error = true;
         }
     }
 }

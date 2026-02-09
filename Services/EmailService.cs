@@ -14,7 +14,7 @@ namespace MaestroNotes.Services
             _configuration = configuration;
         }
 
-        public async Task SendLoginLink(string email, string token)
+        public async Task SendLoginLink(string email, string loginToken)
         {
             try
             {
@@ -30,15 +30,11 @@ namespace MaestroNotes.Services
                     Credentials = new NetworkCredential(smtpUser, smtpPass)
                 };
 
-                var magicLink = $"{urlLink}/verify?token={token}";
-
                 // For development/testing without real SMTP, we might want to log the link
                 if (smtpHost == "localhost" || string.IsNullOrEmpty(smtpUser))
                 {
-                    Log.Information($"[MOCK EMAIL] To: {email}, Token: {token}");
-                    Log.Information($"[MOCK EMAIL] Link: {magicLink}");
-                    // In a real app, don't send if not configured properly, or maybe throw.
-                    // But here we log it for testing.
+                    // Fix: Ensure variable name matches parameter
+                    Log.Information($"[MOCK EMAIL] To: {email}, Token: {loginToken}");
                     return;
                 }
 
@@ -46,7 +42,7 @@ namespace MaestroNotes.Services
                 {
                     From = new MailAddress(fromAddress),
                     Subject = "MaestroNotes Login Link",
-                    Body = $"Here is your login link: {magicLink}",
+                    Body = $"Here is your login link: {loginToken}",
                     IsBodyHtml = false
                 };
                 mailMessage.To.Add(email);
@@ -57,7 +53,7 @@ namespace MaestroNotes.Services
             catch (Exception ex)
             {
                 Log.Error(ex, "Failed to send email");
-                throw; // Rethrow so the caller knows it failed
+                throw;
             }
         }
     }
