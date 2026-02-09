@@ -93,6 +93,7 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         Log.Error(ex, "An error occurred during database initialization.");
+        DataMigrationService.MigrateData(context);
     }
 }
 
