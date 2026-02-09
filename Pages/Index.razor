@@ -183,45 +183,41 @@
                                                     <i class="fas fa-info-circle me-2 text-info"></i> Details
                                                 </a>
                                             </li>
-                                        }
-                                    </ul>
-                                </div>
-                            </td>
-                            <td class="d-md-none mobile-images">
-                                @if (record.HasImages)
-                                {
-                                    <button class="btn btn-sm btn-outline-secondary w-100 mb-2" @onclick="() => ToggleImages(record)">
-                                        @(record.ShowImages ? "Bilder verbergen" : "Bilder anzeigen")
-                                    </button>
-                                    @if (record.ShowImages)
-                                    {
-                                        <div class="image-gallery mt-2">
-                                            @foreach (var img in record.Images)
-                                            {
-                                                <div class="mb-2">
-                                                    <img src="@img.path" alt="@img.fn" class="img-fluid rounded shadow-sm" style="max-width: 100%;" />
-                                                    <div class="text-muted small">@img.fn</div>
-                                                </div>
-                                            }
-                                        </div>
-                                    }
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-}
-else
-{
-    <div class="text-center mt-5">
-        <h3 class="mb-4">Meine Konzerte</h3>
-        <p> <img src="Images/dresden.jpg" class="img-fluid rounded shadow" style="max-height: 500px;" /> </p>
-        <div class="form-group mt-3 d-inline-block">
-            <label class="me-2">Logon:</label>
-            <input type="text" @oninput="PageEnabler" id="EnablePage" class="form-control d-inline-block" style="width: 100px;" />
+
+                                            <AuthorizeView Roles="Admin" Context="adminItemContext">
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
+                                                        <i class="fas fa-upload me-2 text-success"></i> Upload
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item" role="button" @onclick="() => Edit(record.Id)">
+                                                        <i class="fas fa-edit me-2 text-primary"></i> Bearbeiten
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item text-danger" role="button" @onclick="() => OpenDeleteModal(record)">
+                                                        <i class="fas fa-trash me-2"></i> Löschen
+                                                    </a>
+                                                </li>
+                                            </AuthorizeView>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <div class="text-center mt-5">
+            <h3 class="mb-4">Meine Konzerte</h3>
+            <p> <img src="Images/dresden.jpg" class="img-fluid rounded shadow" style="max-height: 500px;" /> </p>
+            <p class="mt-4">Bitte melden Sie sich an, um auf die Konzertdatenbank zuzugreifen.</p>
+            <a href="/login" class="btn btn-primary btn-lg mt-2">Zum Login</a>
         </div>
     </NotAuthorized>
 </AuthorizeView>
@@ -250,19 +246,10 @@ else
         {
             <div class="mb-3">
                 <h5>@DetailsRecord.KomponistNames: @DetailsRecord.WerkNames</h5>
-                <div class="small">
-                    <strong>Ort:</strong> @DetailsRecord.Ort |
-                    <strong>Datum:</strong> @DetailsRecord.Datum.ToString("dd.MM.yyyy") |
-                    <strong>Dirigent:</strong> @DetailsRecord.DirigentName
-                </div>
-
-                @if (!string.IsNullOrEmpty(DetailsRecord.Bewertung))
-                {
-                    <div class="mt-2 p-2 border rounded bg-light small" style="max-height: 100px; overflow-y: auto;">
-                        <strong>Bemerkung:</strong><br />
-                        @DetailsRecord.Bewertung
-                    </div>
-                }
+                <p>
+                    <strong>Ort:</strong> @DetailsRecord.Ort <br />
+                    <strong>Datum:</strong> @DetailsRecord.Datum.ToString("dd.MM.yyyy")
+                </p>
             </div>
 
             <hr />
@@ -585,30 +572,33 @@ else
     private List<MusicRecordDisplayDto> MusicRecords = new();
 
     [CascadingParameter]
-    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthenticationStateTask;
-        if (authState.User.Identity?.IsAuthenticated == true)
+        if (AuthenticationStateTask != null)
         {
-            try
+            var authState = await AuthenticationStateTask;
+            if (authState.User.Identity?.IsAuthenticated == true)
             {
-                // Load lists
-                availableWerke = Service.GetUsedWerkeNames();
-                availableKomponisten = Service.GetUsedKomponistenNames();
-                availableDirigenten = Service.GetUsedDirigentenNames();
-                availableSolisten = Service.GetUsedSolistenNames();
-                availableOrchester = Service.GetUsedOrchesterNames();
-                availableOrte = Service.GetUsedOrte();
-                availableSaisons = Service.GetUsedSaisons();
+                try
+                {
+                    // Load lists
+                    availableWerke = Service.GetUsedWerkeNames();
+                    availableKomponisten = Service.GetUsedKomponistenNames();
+                    availableDirigenten = Service.GetUsedDirigentenNames();
+                    availableSolisten = Service.GetUsedSolistenNames();
+                    availableOrchester = Service.GetUsedOrchesterNames();
+                    availableOrte = Service.GetUsedOrte();
+                    availableSaisons = Service.GetUsedSaisons();
 
-                RefreshList();
-            }
-            catch (Exception ex)
-            {
-                // Log error or handle gracefully
-                Console.WriteLine($"Error loading data: {ex.Message}");
+                    RefreshList();
+                }
+                catch (Exception ex)
+                {
+                    // Log error or handle gracefully
+                    Console.WriteLine($"Error loading data: {ex.Message}");
+                }
             }
         }
     }
@@ -961,15 +951,5 @@ else
             // Refresh main list as names might have changed
             RefreshList();
         }
-    }
-
-    private void ToggleImages(MusicRecordDisplayDto record)
-    {
-        if (!record.ImagesLoaded)
-        {
-            record.Images = Service.GetImages(record.Id);
-            record.ImagesLoaded = true;
-        }
-        record.ShowImages = !record.ShowImages;
     }
 }

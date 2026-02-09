@@ -23,10 +23,6 @@ namespace MaestroNotes.Services
                 var smtpUser = _configuration["Smtp:User"];
                 var smtpPass = _configuration["Smtp:Password"];
                 var fromAddress = _configuration["Smtp:FromAddress"] ?? "noreply@maestronotes.local";
-                var urlLink = _configuration["Smtp:Link"];
-                if (urlLink is not null)
-                    if (urlLink.EndsWith("/"))
-                        urlLink = urlLink.Substring(0, urlLink.Length - 1);
 
                 using var client = new SmtpClient(smtpHost, smtpPort)
                 {
@@ -47,7 +43,7 @@ namespace MaestroNotes.Services
                 {
                     From = new MailAddress(fromAddress),
                     Subject = "MaestroNotes Login Link",
-                    Body = $"Here is your login link: {urlLink}?{token}",
+                    Body = $"Here is your login link: {token}",
                     IsBodyHtml = false
                 };
                 mailMessage.To.Add(email);
