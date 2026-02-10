@@ -1,9 +1,9 @@
 using MaestroNotes.Data;
 using MaestroNotes.Data.Ai;
 using MaestroNotes.Services;
-using MaestroNotes.Auth;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +13,7 @@ SetLogging(builder);
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+builder.Services.AddControllers();
 
 // Configure AI Settings
 builder.Services.Configure<AiSettings>(builder.Configuration.GetSection("AiSettings"));
@@ -28,7 +29,15 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<MusicService>();
 
 // Register Authentication
-builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "MaestroNotesAuth";
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.SlidingExpiration = true;
+        options.LoginPath = "/login";
+        options.LogoutPath = "/auth/logout";
+    });
 
 // Register AI Service and Provider
 builder.Services.AddScoped<AiService>();
@@ -63,6 +72,10 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
@@ -103,35 +116,11 @@ static void SetLogging(WebApplicationBuilder builder)
     // Optional: Serilog internal diagnostics to help when sinks fail
     // SelfLog.Enable(msg => Console.Error.WriteLine(msg));
 
-    // 1) Read desired path from config
-    var configuredPath = builder.Configuration["Serilog:WriteTo:1:Args:path"] ?? "logs\\log.txt";
-
-    // 2) Make it absolute based on content root (more predictable under IIS)
-    var fullPath = Path.IsPathRooted(configuredPath)
-        ? configuredPath
-        : Path.Combine(builder.Environment.ContentRootPath, configuredPath);
-
-    // 3) Ensure directory exists; if not possible, fall back to console-only file path or skip file sink
-    try
-    {
-        var dir = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrWhiteSpace(dir))
-            Directory.CreateDirectory(dir);
-    }
-    catch
-    {
-        // If directory creation fails, fall back to a safe location or skip file sink
-        fullPath = Path.Combine(builder.Environment.ContentRootPath, "log.txt");
-    }
-
-    // 4) Build logger primarily from configuration
+    // Configure Serilog to use Console only, respecting user request to not store logs in repo
     builder.Host.UseSerilog((ctx, services, lc) =>
     {
         lc.ReadFrom.Configuration(ctx.Configuration)
-          .Enrich.FromLogContext();
-
-        // Optionally override the file path from config with the resolved absolute path:
-        // (Easiest way is to keep config relative and just pass fullPath in code)
-        lc.WriteTo.File(fullPath, rollingInterval: RollingInterval.Day);
+          .Enrich.FromLogContext()
+          .WriteTo.Console();
     });
 }

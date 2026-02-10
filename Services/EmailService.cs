@@ -23,6 +23,8 @@ namespace MaestroNotes.Services
                 var smtpUser = _configuration["Smtp:User"];
                 var smtpPass = _configuration["Smtp:Password"];
                 var fromAddress = _configuration["Smtp:FromAddress"] ?? "noreply@maestronotes.local";
+                var linkBase = _configuration["Smtp:Link"] ?? "https://localhost:7121";
+                var fullLink = $"{linkBase}/auth/verify?token={loginToken}";
 
                 using var client = new SmtpClient(smtpHost, smtpPort)
                 {
@@ -34,7 +36,7 @@ namespace MaestroNotes.Services
                 if (smtpHost == "localhost" || string.IsNullOrEmpty(smtpUser))
                 {
                     // Fix: Ensure variable name matches parameter
-                    Log.Information($"[MOCK EMAIL] To: {email}, Token: {loginToken}");
+                    Log.Information($"[MOCK EMAIL] To: {email}, Link: {fullLink}");
                     return;
                 }
 
@@ -42,7 +44,7 @@ namespace MaestroNotes.Services
                 {
                     From = new MailAddress(fromAddress),
                     Subject = "MaestroNotes Login Link",
-                    Body = $"Here is your login link: {loginToken}",
+                    Body = $"Here is your login link: {fullLink}",
                     IsBodyHtml = false
                 };
                 mailMessage.To.Add(email);
