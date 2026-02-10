@@ -24,6 +24,8 @@ namespace MaestroNotes.Services
                 var smtpPass = _configuration["Smtp:Password"];
                 var fromAddress = _configuration["Smtp:FromAddress"] ?? "noreply@maestronotes.local";
                 var linkBase = _configuration["Smtp:Link"] ?? "https://localhost:7121";
+                if (linkBase.EndsWith("/"))
+                    linkBase = linkBase.Substring(0, linkBase.Length - 1);
                 var fullLink = $"{linkBase}/auth/verify?token={loginToken}";
 
                 using var client = new SmtpClient(smtpHost, smtpPort)
