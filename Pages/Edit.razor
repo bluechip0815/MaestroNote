@@ -1,8 +1,10 @@
 @using System.ComponentModel.DataAnnotations
 @using MaestroNotes.Data
+@using Microsoft.Extensions.Logging
 @inject MusicService Service
 @inject AiService AiService
 @inject IJSRuntime JSRuntime
+@inject ILogger<Edit> Logger
 
 <EditForm Model="@currentRecord">
     <DataAnnotationsValidator />
@@ -460,6 +462,8 @@
     private int selectedWerkToAddId;
     private int selectedSolistToAddId;
 
+    private const string AiErrorMessage = "KI konnte leider keine Antwort finden";
+
     protected override void OnInitialized()
     {
         LoadLists();
@@ -498,10 +502,15 @@
                 newOrchester.Founded = dto.Founded;
                 newOrchester.Note = dto.Note;
             }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            }
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+            Logger.LogError(ex, "Error in FillOrchesterAi");
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
         }
     }
 
@@ -523,10 +532,15 @@
                 newDirigent.Born = dto.Born;
                 newDirigent.Note = dto.Note;
             }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            }
         }
         catch (Exception ex)
         {
-             await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+             Logger.LogError(ex, "Error in FillDirigentAi");
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
         }
     }
 
@@ -547,10 +561,15 @@
                 newSolist.Born = dto.Born;
                 newSolist.Note = dto.Note;
             }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            }
         }
         catch (Exception ex)
         {
-             await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+             Logger.LogError(ex, "Error in FillSolistAi");
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
         }
     }
 
@@ -571,10 +590,15 @@
                 newKomponist.Born = dto.Born;
                 newKomponist.Note = dto.Note ?? "";
             }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            }
         }
         catch (Exception ex)
         {
-             await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+             Logger.LogError(ex, "Error in FillKomponistAi");
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
         }
     }
 
@@ -593,10 +617,15 @@
             {
                 newOrt.Note = dto.Note;
             }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            }
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+            Logger.LogError(ex, "Error in FillOrtAi");
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
         }
     }
 
@@ -629,10 +658,15 @@
             {
                 newWerk.Note = dto.Note;
             }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            }
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+            Logger.LogError(ex, "Error in FillWerkAi");
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
         }
     }
 
