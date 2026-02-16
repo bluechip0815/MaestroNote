@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using MaestroNotes.Data.Ai;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace MaestroNotes.Data
 {
@@ -44,11 +45,13 @@ namespace MaestroNotes.Data
     {
         private readonly IAiProvider _aiProvider;
         private readonly AiSettings _settings;
+        private readonly ILogger<AiService> _logger;
 
-        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings)
+        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings, ILogger<AiService> logger)
         {
             _aiProvider = aiProvider;
             _settings = settings.Value;
+            _logger = logger;
         }
 
         public async Task<object> RequestAiData(string name, string itemType)
@@ -104,10 +107,13 @@ namespace MaestroNotes.Data
 
             try
             {
+                _logger.LogInformation("Sending AI Request for {ItemType}: {Name}", itemType, name);
                 string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, _settings.Model);
 
                 // Clean up potential markdown code blocks (```json ... ```)
                 jsonResponse = StripMarkdown(jsonResponse);
+
+                _logger.LogDebug("AI Response Raw: {JsonResponse}", jsonResponse);
 
                 var options = new JsonSerializerOptions
                 {
@@ -118,7 +124,7 @@ namespace MaestroNotes.Data
             }
             catch (Exception ex)
             {
-                // In a real scenario, you might want to log this error
+                _logger.LogError(ex, "AI request failed");
                 throw new ApplicationException($"AI request failed: {ex.Message}", ex);
             }
         }

@@ -6,10 +6,12 @@
 @using System.Text.Json
 @using System.Text.Json.Serialization
 @using static MaestroNotes.Data.MusicService
+@using Microsoft.Extensions.Logging
 
 @inject MusicService Service
 @inject AiService AiService
 @inject IJSRuntime JS
+@inject ILogger<Index> Logger
 
 <PageTitle>Meine Konzerte</PageTitle>
 
@@ -540,6 +542,8 @@
     private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
     private int selectedLimit = 5;
 
+    private const string AiErrorMessage = "KI konnte leider keine Antwort finden";
+
     // Search properties
     private List<string> searchCategories = new() { "Werk", "Komponist", "Dirigent", "Ort", "Solist", "Orchester", "Note", "Datum", "Saisson" };
 
@@ -875,6 +879,7 @@
         if (EditMasterItem == null) return;
 
         string name = "";
+        bool success = false;
         try
         {
             switch (MasterType)
@@ -884,35 +889,35 @@
                     name = $"{d.Vorname} {d.Name}".Trim();
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var dRes = await AiService.RequestAiData(name, "Dirigent") as AiDirigentResponseDto;
-                    if (dRes != null) { d.Born = dRes.Born; d.Note = dRes.Note; }
+                    if (dRes != null) { d.Born = dRes.Born; d.Note = dRes.Note; success = true; }
                     break;
                 case "Solist":
                     var s = (Solist)EditMasterItem;
                     name = $"{s.Vorname} {s.Name}".Trim();
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var sRes = await AiService.RequestAiData(name, "Solist") as AiSolistResponseDto;
-                    if (sRes != null) { s.Born = sRes.Born; s.Note = sRes.Note; }
+                    if (sRes != null) { s.Born = sRes.Born; s.Note = sRes.Note; success = true; }
                     break;
                 case "Komponist":
                     var k = (Komponist)EditMasterItem;
                     name = $"{k.Vorname} {k.Name}".Trim();
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var kRes = await AiService.RequestAiData(name, "Komponist") as AiKomponistResponseDto;
-                    if (kRes != null) { k.Born = kRes.Born; k.Note = kRes.Note ?? ""; }
+                    if (kRes != null) { k.Born = kRes.Born; k.Note = kRes.Note ?? ""; success = true; }
                     break;
                 case "Orchester":
                     var o = (Orchester)EditMasterItem;
                     name = o.Name;
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var oRes = await AiService.RequestAiData(name, "Orchester") as AiOrchesterResponseDto;
-                    if (oRes != null) { o.Founded = oRes.Founded; o.Note = oRes.Note; }
+                    if (oRes != null) { o.Founded = oRes.Founded; o.Note = oRes.Note; success = true; }
                     break;
                 case "Ort":
                     var ort = (Ort)EditMasterItem;
                     name = ort.Name;
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var ortRes = await AiService.RequestAiData(name, "Ort") as AiOrtResponseDto;
-                    if (ortRes != null) { ort.Note = ortRes.Note; }
+                    if (ortRes != null) { ort.Note = ortRes.Note; success = true; }
                     break;
                 case "Werk":
                     var w = (Werk)EditMasterItem;
@@ -925,13 +930,19 @@
 
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var wRes = await AiService.RequestAiData(name, "Werk") as AiWerkResponseDto;
-                    if (wRes != null) { w.Note = wRes.Note; }
+                    if (wRes != null) { w.Note = wRes.Note; success = true; }
                     break;
+            }
+
+            if (!success)
+            {
+                await JS.InvokeVoidAsync("alert", AiErrorMessage);
             }
         }
         catch (Exception ex)
         {
-             await JS.InvokeVoidAsync("alert", $"Fehler bei der AI-Abfrage: {ex.Message}");
+             Logger.LogError(ex, "Error in FillMasterAi");
+             await JS.InvokeVoidAsync("alert", AiErrorMessage);
         }
     }
 
