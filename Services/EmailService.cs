@@ -37,7 +37,6 @@ namespace MaestroNotes.Services
                 // For development/testing without real SMTP, we might want to log the link
                 if (smtpHost == "localhost" || string.IsNullOrEmpty(smtpUser))
                 {
-                    // Fix: Ensure variable name matches parameter
                     Log.Information($"[MOCK EMAIL] To: {email}, Link: {fullLink}");
                     return;
                 }
@@ -57,6 +56,56 @@ namespace MaestroNotes.Services
             catch (Exception ex)
             {
                 Log.Error(ex, "Failed to send email");
+                throw;
+            }
+        }
+
+        public async Task SendEmailWithAttachment(string email, string subject, string body, string attachmentPath)
+        {
+            try
+            {
+                var smtpHost = _configuration["Smtp:Host"] ?? "localhost";
+                var smtpPort = int.Parse(_configuration["Smtp:Port"] ?? "25");
+                var smtpUser = _configuration["Smtp:User"];
+                var smtpPass = _configuration["Smtp:Password"];
+                var fromAddress = _configuration["Smtp:FromAddress"] ?? "noreply@maestronotes.local";
+
+                using var client = new SmtpClient(smtpHost, smtpPort)
+                {
+                    EnableSsl = true,
+                    Credentials = new NetworkCredential(smtpUser, smtpPass)
+                };
+
+                if (smtpHost == "localhost" || string.IsNullOrEmpty(smtpUser))
+                {
+                    Log.Information($"[MOCK EMAIL] To: {email}, Subject: {subject}, Body: {body}, Attachment: {attachmentPath}");
+                    return;
+                }
+
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(fromAddress),
+                    Subject = subject,
+                    Body = body,
+                    IsBodyHtml = false
+                };
+                mailMessage.To.Add(email);
+
+                if (File.Exists(attachmentPath))
+                {
+                    mailMessage.Attachments.Add(new Attachment(attachmentPath));
+                }
+                else
+                {
+                    Log.Warning($"Attachment not found: {attachmentPath}");
+                }
+
+                await client.SendMailAsync(mailMessage);
+                Log.Information($"Email sent to {email} with attachment");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to send email with attachment");
                 throw;
             }
         }

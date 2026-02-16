@@ -120,6 +120,7 @@
                 </select>
 
                 <AuthorizeView Roles="Admin" Context="adminContext">
+                    <button class="btn btn-secondary me-2" @onclick="OpenExportModal">Export</button>
                     <div class="dropdown d-inline-block me-2">
                         <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMaster" data-bs-toggle="dropdown" aria-expanded="false">
                             Stammdaten
@@ -537,6 +538,23 @@
     </FooterContent>
 </ModalDialog>
 
+
+<ModalDialog Title="Daten Exportieren" Show="@ShowExportModal" OnClose="@CloseExportModal" ShowFooter="true">
+    <ChildContent>
+        <div class="form-group">
+            <label class="form-label">Von:</label>
+            <input type="date" class="form-control" @bind="ExportFrom" />
+        </div>
+        <div class="form-group mt-3">
+            <label class="form-label">Bis:</label>
+            <input type="date" class="form-control" @bind="ExportTo" />
+        </div>
+    </ChildContent>
+    <FooterContent>
+        <button class="btn btn-secondary" @onclick="() => CloseExportModal(false)">Abbrechen</button>
+        <button class="btn btn-primary" @onclick="DoExport">Exportieren</button>
+    </FooterContent>
+</ModalDialog>
 
 @code {
     private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
@@ -961,6 +979,65 @@
 
             // Refresh main list as names might have changed
             RefreshList();
+        }
+    }
+
+    // --- Export Logic ---
+    private bool ShowExportModal = false;
+    private DateTime ExportFrom = DateTime.Now;
+    private DateTime ExportTo = DateTime.Now;
+
+    private void OpenExportModal()
+    {
+        ExportFrom = new DateTime(DateTime.Now.Year, 1, 1);
+        ExportTo = DateTime.Now;
+        ShowExportModal = true;
+    }
+
+    private Task CloseExportModal(bool result)
+    {
+        ShowExportModal = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task DoExport()
+    {
+        if (AuthenticationStateTask != null)
+        {
+            var authState = await AuthenticationStateTask;
+            var user = authState.User;
+            string name = user.Identity?.Name ?? "";
+
+            if (string.IsNullOrEmpty(name))
+            {
+                await ShowInfo("Kein Benutzer angemeldet.");
+                return;
+            }
+
+            string? email = await Service.GetUserEmail(name);
+            if (string.IsNullOrEmpty(email))
+            {
+                await ShowInfo("Keine E-Mail-Adresse gefunden.");
+                return;
+            }
+
+            // Close modal first or wait? Better UX to close and show spinner, but we just show info after.
+            // Let's keep modal open or close it?
+            // Original requirement: "Export function request a time range... when selected the MusicService .ExportRtf is executed."
+            // I'll execute and then show info.
+
+            await ShowInfo("Export wird erstellt und versendet...");
+            ShowExportModal = false;
+
+            bool result = await Service.ExportRtf(DateOnly.FromDateTime(ExportFrom), DateOnly.FromDateTime(ExportTo), email);
+            if (result)
+            {
+                await ShowInfo("Export erfolgreich per E-Mail versendet.");
+            }
+            else
+            {
+                await ShowInfo("Export fehlgeschlagen oder keine Daten gefunden.");
+            }
         }
     }
 }
