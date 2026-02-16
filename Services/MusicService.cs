@@ -1,8 +1,8 @@
-using Serilog;
+using MaestroNotes.Data;
 using Microsoft.EntityFrameworkCore;
-using MaestroNotes.Services;
+using Serilog;
 
-namespace MaestroNotes.Data
+namespace MaestroNotes.Services
 {
     public class MusicService
     {
@@ -541,10 +541,23 @@ namespace MaestroNotes.Data
             _spielSaisonCache = list;
             return _spielSaisonCache;
         }
-
         public List<string> GetUsedSaisons()
         {
             return GetSpielSaisonList();
+        }
+        public bool ExportRtf(DateOnly from, DateOnly to)
+        {
+            List<RtfRecord> records = new();
+            // Export to RTF
+
+            // Parse the content into a list of RtfRecord objects
+
+            string rtfFilePath = "temp.rtf";
+            RtfExporter r = new(Directory.GetCurrentDirectory());
+            r.ExportToRtf(rtfFilePath, records);
+            // Send Email
+
+            return records.Count > 0;
         }
     }
 }

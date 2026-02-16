@@ -1,6 +1,7 @@
+using MaestroNotes.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace MaestroNotes.Data
+namespace MaestroNotes.Services
 {
     public class DataMigrationService
     {
