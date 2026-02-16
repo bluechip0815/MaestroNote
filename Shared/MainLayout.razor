@@ -6,12 +6,12 @@
 
 <div class="page">
     <main>
-        <div class="top-row px-4 d-flex justify-content-between align-items-center bg-light border-bottom mb-3 py-2">
+        <div class="top-row auth px-4 d-flex justify-content-between align-items-center bg-light border-bottom mb-3 py-2">
             <h3 class="mb-0">Maestro Notes</h3>
             <div>
                 <AuthorizeView>
                     <Authorized>
-                        <span class="me-3 text-muted">@context.User.Identity?.Name</span>
+                        <span class="me-3 text-primary">Hallo @context.User.Identity?.Name</span>
                         <a href="/auth/logout" class="btn btn-sm btn-outline-danger">
                             <i class="fas fa-sign-out-alt me-1"></i> Logout
                         </a>
