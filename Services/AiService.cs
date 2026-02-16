@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
-namespace MaestroNotes.Data
+namespace MaestroNotes.Services
 {
     public class AiDirigentResponseDto
     {
