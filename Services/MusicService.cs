@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using MaestroNotes.Data;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -24,6 +25,12 @@ namespace MaestroNotes.Services
         }
 
         // Authentication Methods
+        public async Task<string?> GetUserEmail(string username)
+        {
+             var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == username);
+             return user?.Email;
+        }
+
         public async Task<bool> RequestLoginLink(string name)
         {
             try
@@ -552,19 +559,135 @@ namespace MaestroNotes.Services
         {
             return GetSpielSaisonList();
         }
-        public bool ExportRtf(DateOnly from, DateOnly to)
+        public async Task<bool> ExportRtf(DateOnly from, DateOnly to, string emailAddress)
         {
-            List<RtfRecord> records = new();
-            // Export to RTF
+            try
+            {
+                // 1. Fetch Data
+                DateTime dtFrom = from.ToDateTime(TimeOnly.MinValue);
+                DateTime dtTo = to.ToDateTime(TimeOnly.MaxValue);
 
-            // Parse the content into a list of RtfRecord objects
+                var musicRecords = _context.MusicRecords
+                    .Include(m => m.Dirigent)
+                    .Include(m => m.Orchester)
+                    .Include(m => m.OrtEntity)
+                    .Include(m => m.Werke).ThenInclude(w => w.Komponist)
+                    .Include(m => m.Solisten)
+                    .Where(m => m.Datum >= dtFrom && m.Datum <= dtTo)
+                    .OrderBy(m => m.Datum)
+                    .ToList();
 
-            string rtfFilePath = "temp.rtf";
-            RtfExporter r = new(Directory.GetCurrentDirectory());
-            r.ExportToRtf(rtfFilePath, records);
-            // Send Email
+                if (!musicRecords.Any())
+                    return false;
 
-            return records.Count > 0;
+                // 2. Flatten and Map
+                List<RtfRecord> records = new();
+                foreach (var m in musicRecords)
+                {
+                    string solistenNames = string.Join(", ", m.Solisten.Select(s => s.Name + (string.IsNullOrEmpty(s.Vorname) ? "" : ", " + s.Vorname)));
+
+                    if (m.Werke.Any())
+                    {
+                        foreach (var w in m.Werke)
+                        {
+                            var r = new RtfRecord
+                            {
+                                Werk = w.Name,
+                                Orchester = m.Orchester?.Name ?? "",
+                                Solist = solistenNames,
+                                Datum = m.Datum.ToString("dd.MM.yyyy"),
+                                Spielsaison = m.Spielsaison,
+                                Bewertung = m.Bewertung,
+                                Ort = m.OrtEntity?.Name ?? ""
+                            };
+
+                            if (w.Komponist != null)
+                            {
+                                r._komponist._Name = w.Komponist.Name;
+                                r._komponist._Vorname = w.Komponist.Vorname ?? "";
+                            }
+                            if (m.Dirigent != null)
+                            {
+                                r._dirigent._Name = m.Dirigent.Name;
+                                r._dirigent._Vorname = m.Dirigent.Vorname ?? "";
+                            }
+
+                            records.Add(r);
+                        }
+                    }
+                    else
+                    {
+                        var r = new RtfRecord
+                        {
+                            Werk = "",
+                            Orchester = m.Orchester?.Name ?? "",
+                            Solist = solistenNames,
+                            Datum = m.Datum.ToString("dd.MM.yyyy"),
+                            Spielsaison = m.Spielsaison,
+                            Bewertung = m.Bewertung,
+                            Ort = m.OrtEntity?.Name ?? ""
+                        };
+                        if (m.Dirigent != null)
+                        {
+                            r._dirigent._Name = m.Dirigent.Name;
+                            r._dirigent._Vorname = m.Dirigent.Vorname ?? "";
+                        }
+                        records.Add(r);
+                    }
+                }
+
+                // 3. Generate RTF
+                string tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(tempDir);
+                string rtfFileName = "MaestroNotes.rtf";
+                string rtfFilePath = Path.Combine(tempDir, rtfFileName);
+
+                string imagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Images");
+                RtfExporter exporter = new(imagePath);
+                exporter.ExportToRtf(rtfFilePath, records);
+
+                // 4. Zip
+                string zipFileName = $"Export_{DateTime.Now:yyyyMMdd}.zip";
+                string zipFilePath = Path.Combine(Path.GetTempPath(), zipFileName);
+                if (File.Exists(zipFilePath)) File.Delete(zipFilePath);
+
+                using (var archive = System.IO.Compression.ZipFile.Open(zipFilePath, System.IO.Compression.ZipArchiveMode.Create))
+                {
+                    archive.CreateEntryFromFile(rtfFilePath, rtfFileName);
+                }
+
+                // 5. Email
+                string subject = "MaestroNotes Export";
+                string userName = "User";
+
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == emailAddress);
+                if (user != null)
+                {
+                    userName = user.Name;
+                }
+
+                string body = $"Hello {userName},\n\nAttached please find your notes export.\n\nBest regards,\nMaestroNotes";
+
+                await _emailService.SendEmailWithAttachment(emailAddress, subject, body, zipFilePath);
+
+                // 6. Cleanup
+                try
+                {
+                    Directory.Delete(tempDir, true);
+                    File.Delete(zipFilePath);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error cleaning up export files");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error in ExportRtf");
+                return false;
+            }
         }
     }
 }
