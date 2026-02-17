@@ -116,7 +116,7 @@
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dropdownSpecials">
                         <li><a class="dropdown-item" role="button" @onclick="OpenAiFillModal">KI Vervollständigen</a></li>
-                        <li><a class="dropdown-item" role="button" @onclick="ExportData">Export</a></li>
+                        <li><a class="dropdown-item" role="button" @onclick="OpenExportModal">Export</a></li>
                     </ul>
                 </div>
 
@@ -305,6 +305,23 @@
             }
         }
     </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="Daten Exportieren" Show="@ShowExportModal" OnClose="@CloseExportModal" ShowFooter="true">
+    <ChildContent>
+        <div class="form-group">
+            <label class="form-label">Von:</label>
+            <input type="date" class="form-control" @bind="ExportFrom" />
+        </div>
+        <div class="form-group mt-3">
+            <label class="form-label">Bis:</label>
+            <input type="date" class="form-control" @bind="ExportTo" />
+        </div>
+    </ChildContent>
+    <FooterContent>
+        <button class="btn btn-secondary" @onclick="() => CloseExportModal(false)">Abbrechen</button>
+        <button class="btn btn-primary" @onclick="DoExport">Exportieren</button>
+    </FooterContent>
 </ModalDialog>
 
 <ModalDialog Title="Datei hochladen" Show="@ShowUploadModal" OnClose="@CloseUploadModalWrapper" ShowFooter="false">
@@ -1195,16 +1212,48 @@
         }
     }
 
-    private async Task ExportData()
+    private bool ShowExportModal = false;
+    private DateOnly ExportFrom = new DateOnly(DateTime.Now.Year, 1, 1);
+    private DateOnly ExportTo = new DateOnly(DateTime.Now.Year, 12, 31);
+
+    private void OpenExportModal()
     {
-         var from = new DateOnly(DateTime.Now.Year, 1, 1);
-         var to = new DateOnly(DateTime.Now.Year, 12, 31);
+        ExportFrom = new DateOnly(DateTime.Now.Year, 1, 1);
+        ExportTo = new DateOnly(DateTime.Now.Year, 12, 31);
+        ShowExportModal = true;
+    }
 
-         bool success = Service.ExportRtf(from, to);
+    private Task CloseExportModal(bool result)
+    {
+        ShowExportModal = false;
+        return Task.CompletedTask;
+    }
 
-         if (success)
-            await ShowInfo("Export für aktuelles Jahr angestoßen (Email).");
-         else
+    private async Task DoExport()
+    {
+        string? email = null;
+        if (AuthenticationStateTask != null)
+        {
+            var authState = await AuthenticationStateTask;
+            if (authState.User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(authState.User.Identity.Name))
+            {
+                 email = await Service.GetUserEmail(authState.User.Identity.Name);
+            }
+        }
+
+        if (string.IsNullOrEmpty(email))
+        {
+            await ShowInfo("Konnte Email-Adresse nicht ermitteln.");
+            return;
+        }
+
+        bool success = await Service.ExportRtf(ExportFrom, ExportTo, email);
+
+        ShowExportModal = false;
+
+        if (success)
+            await ShowInfo("Export angestoßen. Bitte prüfen Sie Ihre Emails.");
+        else
             await ShowInfo("Keine Daten für Export oder Fehler.");
     }
 }
