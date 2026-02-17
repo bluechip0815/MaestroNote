@@ -416,6 +416,13 @@ namespace MaestroNotes.Services
         public List<Solist> GetAllSolisten() => _context.Solisten.ToList();
         public List<Ort> GetAllOrte() => _context.Orte.ToList();
 
+        public List<Komponist> GetIncompleteKomponisten() => _context.Komponisten.Where(k => k.Born == null && (k.Note == null || k.Note == "")).ToList();
+        public List<Dirigent> GetIncompleteDirigenten() => _context.Dirigenten.Where(d => d.Born == null && (d.Note == null || d.Note == "")).ToList();
+        public List<Solist> GetIncompleteSolisten() => _context.Solisten.Where(s => s.Born == null && (s.Note == null || s.Note == "")).ToList();
+        public List<Orchester> GetIncompleteOrchester() => _context.Orchester.Where(o => o.Founded == null && (o.Note == null || o.Note == "")).ToList();
+        public List<Werk> GetIncompleteWerke() => _context.Werke.Include(w => w.Komponist).Where(w => (w.Note == null || w.Note == "")).ToList();
+        public List<Ort> GetIncompleteOrte() => _context.Orte.Where(o => (o.Note == null || o.Note == "")).ToList();
+
         // NoTracking variants for Master Data Management to avoid context tracking conflicts
         public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().ToList();
         public List<Werk> GetAllWerkeNoTracking() => _context.Werke.Include(w => w.Komponist).AsNoTracking().ToList();
