@@ -1109,7 +1109,7 @@
         }
     }
 
-    private async Task ProcessList<T>(List<T> items, string type)
+    private async Task ProcessList<T>(List<T> items, string type) where T : class
     {
         foreach (var item in items)
         {
@@ -1120,15 +1120,15 @@
             {
                 string name = "";
                 // Determine name based on type
-                if (item is Komponist k) name = $"{k.Vorname} {k.Name}".Trim();
-                else if (item is Dirigent d) name = $"{d.Vorname} {d.Name}".Trim();
-                else if (item is Solist s) name = $"{s.Vorname} {s.Name}".Trim();
-                else if (item is Orchester o) name = o.Name;
+                if (item is Komponist komp) name = $"{komp.Vorname} {komp.Name}".Trim();
+                else if (item is Dirigent dir) name = $"{dir.Vorname} {dir.Name}".Trim();
+                else if (item is Solist sol) name = $"{sol.Vorname} {sol.Name}".Trim();
+                else if (item is Orchester orch) name = orch.Name;
                 else if (item is Ort ort) name = ort.Name;
-                else if (item is Werk w)
+                else if (item is Werk werk)
                 {
-                    name = w.Name;
-                    if (w.Komponist != null) name += $" ({w.Komponist.Vorname} {w.Komponist.Name})";
+                    name = werk.Name;
+                    if (werk.Komponist != null) name += $" ({werk.Komponist.Vorname} {werk.Komponist.Name})";
                 }
 
                 if (!string.IsNullOrWhiteSpace(name))
