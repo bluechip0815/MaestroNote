@@ -110,6 +110,16 @@
 
                 <button class="btn btn-secondary" @onclick="RefreshList">Zeige</button>
 
+                <div class="dropdown d-inline-block ms-2">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownSpecials" data-bs-toggle="dropdown" aria-expanded="false">
+                        Specials
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dropdownSpecials">
+                        <li><a class="dropdown-item" role="button" @onclick="OpenAiFillModal">KI Vervollständigen</a></li>
+                        <li><a class="dropdown-item" role="button" @onclick="ExportData">Export</a></li>
+                    </ul>
+                </div>
+
                 <span>@GetNumber() Datensätze</span>
 
                 <select id="number" value="@selectedLimit" @onchange="Display" class="form-select" style="width:auto;">
@@ -537,6 +547,59 @@
     </FooterContent>
 </ModalDialog>
 
+<ModalDialog Title="KI Vervollständigen" Show="@ShowAiFillModal" OnClose="@CloseAiFillModal" ShowFooter="false">
+    <ChildContent>
+        @if (IsAiProcessing)
+        {
+            <div class="text-center my-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5 class="mt-3">@AiProgressMessage</h5>
+                <p>Verarbeite @AiProgressCurrent von @AiProgressTotal</p>
+                <progress value="@AiProgressCurrent" max="@AiProgressTotal" class="w-100"></progress>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkKomponist" @bind="fillKomponist">
+                        <label class="form-check-label" for="chkKomponist">Komponist</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkDirigent" @bind="fillDirigent">
+                        <label class="form-check-label" for="chkDirigent">Dirigent</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkSolist" @bind="fillSolist">
+                        <label class="form-check-label" for="chkSolist">Solist</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkOrchester" @bind="fillOrchester">
+                        <label class="form-check-label" for="chkOrchester">Orchester</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkWerk" @bind="fillWerk">
+                        <label class="form-check-label" for="chkWerk">Werk</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkOrt" @bind="fillOrt">
+                        <label class="form-check-label" for="chkOrt">Ort</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex justify-content-end gap-2">
+                 <button class="btn btn-secondary" @onclick="() => CloseAiFillModal(false)">Abbrechen</button>
+                 <button class="btn btn-primary" @onclick="StartAiFill">Starten</button>
+            </div>
+        }
+    </ChildContent>
+</ModalDialog>
 
 @code {
     private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
@@ -962,5 +1025,186 @@
             // Refresh main list as names might have changed
             RefreshList();
         }
+    }
+
+    // --- AI Fill Modal ---
+    private bool ShowAiFillModal = false;
+    private bool IsAiProcessing = false;
+    private string AiProgressMessage = "";
+    private int AiProgressCurrent = 0;
+    private int AiProgressTotal = 0;
+
+    private bool fillKomponist = false;
+    private bool fillDirigent = false;
+    private bool fillSolist = false;
+    private bool fillOrchester = false;
+    private bool fillWerk = false;
+    private bool fillOrt = false;
+
+    private void OpenAiFillModal()
+    {
+        ShowAiFillModal = true;
+        IsAiProcessing = false;
+        // Keep selections
+    }
+
+    private Task CloseAiFillModal(bool result)
+    {
+        if (!IsAiProcessing)
+        {
+            ShowAiFillModal = false;
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task StartAiFill()
+    {
+        IsAiProcessing = true;
+        AiProgressCurrent = 0;
+        AiProgressTotal = 0;
+        AiProgressMessage = "Analysiere Datenbestand...";
+        StateHasChanged();
+
+        try
+        {
+            // First pass: count totals
+            var komps = fillKomponist ? Service.GetIncompleteKomponisten() : new List<Komponist>();
+            var dirs = fillDirigent ? Service.GetIncompleteDirigenten() : new List<Dirigent>();
+            var sols = fillSolist ? Service.GetIncompleteSolisten() : new List<Solist>();
+            var orchs = fillOrchester ? Service.GetIncompleteOrchester() : new List<Orchester>();
+            var werks = fillWerk ? Service.GetIncompleteWerke() : new List<Werk>();
+            var orts = fillOrt ? Service.GetIncompleteOrte() : new List<Ort>();
+
+            AiProgressTotal = komps.Count + dirs.Count + sols.Count + orchs.Count + werks.Count + orts.Count;
+
+            if (AiProgressTotal == 0)
+            {
+                await ShowInfo("Keine unvollständigen Datensätze gefunden.");
+                IsAiProcessing = false;
+                ShowAiFillModal = false;
+                return;
+            }
+
+            // Process
+            if (fillKomponist) await ProcessList(komps, "Komponist");
+            if (fillDirigent) await ProcessList(dirs, "Dirigent");
+            if (fillSolist) await ProcessList(sols, "Solist");
+            if (fillOrchester) await ProcessList(orchs, "Orchester");
+            if (fillWerk) await ProcessList(werks, "Werk");
+            if (fillOrt) await ProcessList(orts, "Ort");
+
+            await ShowInfo("Vervollständigung abgeschlossen.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in AI Batch Fill");
+            // Simple alert
+            await JS.InvokeVoidAsync("alert", "Fehler: " + ex.Message);
+        }
+        finally
+        {
+            IsAiProcessing = false;
+            ShowAiFillModal = false;
+            RefreshList();
+        }
+    }
+
+    private async Task ProcessList<T>(List<T> items, string type) where T : class
+    {
+        foreach (var item in items)
+        {
+            AiProgressMessage = $"Verarbeite {type}...";
+            StateHasChanged(); // Ensure UI updates
+
+            try
+            {
+                string name = "";
+                // Determine name based on type
+                if (item is Komponist komp) name = $"{komp.Vorname} {komp.Name}".Trim();
+                else if (item is Dirigent dir) name = $"{dir.Vorname} {dir.Name}".Trim();
+                else if (item is Solist sol) name = $"{sol.Vorname} {sol.Name}".Trim();
+                else if (item is Orchester orch) name = orch.Name;
+                else if (item is Ort ort) name = ort.Name;
+                else if (item is Werk werk)
+                {
+                    name = werk.Name;
+                    if (werk.Komponist != null) name += $" ({werk.Komponist.Vorname} {werk.Komponist.Name})";
+                }
+
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    var result = await AiService.RequestAiData(name, type);
+
+                    bool updated = false;
+                    // Map result
+                    if (type == "Komponist" && result is AiKomponistResponseDto kr)
+                    {
+                        var k = (Komponist)(object)item;
+                        k.Born = kr.Born;
+                        k.Note = kr.Note ?? "";
+                        updated = true;
+                    }
+                    else if (type == "Dirigent" && result is AiDirigentResponseDto dr)
+                    {
+                        var d = (Dirigent)(object)item;
+                        d.Born = dr.Born;
+                        d.Note = dr.Note;
+                        updated = true;
+                    }
+                    else if (type == "Solist" && result is AiSolistResponseDto sr)
+                    {
+                        var s = (Solist)(object)item;
+                        s.Born = sr.Born;
+                        s.Note = sr.Note;
+                        updated = true;
+                    }
+                    else if (type == "Orchester" && result is AiOrchesterResponseDto or)
+                    {
+                        var o = (Orchester)(object)item;
+                        o.Founded = or.Founded;
+                        o.Note = or.Note;
+                        updated = true;
+                    }
+                    else if (type == "Ort" && result is AiOrtResponseDto ortr)
+                    {
+                        var o = (Ort)(object)item;
+                        o.Note = ortr.Note;
+                        updated = true;
+                    }
+                    else if (type == "Werk" && result is AiWerkResponseDto wr)
+                    {
+                        var w = (Werk)(object)item;
+                        w.Note = wr.Note;
+                        updated = true;
+                    }
+
+                    if (updated)
+                    {
+                        await Service.SaveAsync(item);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                 Logger.LogError(ex, $"Error processing {type} item");
+            }
+
+            AiProgressCurrent++;
+            StateHasChanged();
+            await Task.Delay(10);
+        }
+    }
+
+    private async Task ExportData()
+    {
+         var from = new DateOnly(DateTime.Now.Year, 1, 1);
+         var to = new DateOnly(DateTime.Now.Year, 12, 31);
+
+         bool success = Service.ExportRtf(from, to);
+
+         if (success)
+            await ShowInfo("Export für aktuelles Jahr angestoßen (Email).");
+         else
+            await ShowInfo("Keine Daten für Export oder Fehler.");
     }
 }
