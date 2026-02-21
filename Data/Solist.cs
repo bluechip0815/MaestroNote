@@ -15,6 +15,9 @@ namespace MaestroNotes.Data
         [MaxLength(1000)]
         public string? Note { get; set; }
 
+        public DateTime? Died { get; set; }
+        // ALTER TABLE Solisten ADD Died DATETIME NULL;
+
         public List<MusicRecord> MusicRecords { get; set; } = new();
     }
 }

@@ -272,9 +272,15 @@
                 @foreach (DOC item in Service.GetDocuments(DetailsRecord.Id))
                 {
                     <div class="d-flex align-items-center justify-content-between mb-2 p-2 border rounded">
-                        <a href="@item.path" target="_blank" class="text-decoration-none">
-                            <i class="fas fa-file-pdf me-2 text-danger"></i> @item.fn
-                        </a>
+                        <div>
+                            <a href="@item.path" target="_blank" class="text-decoration-none d-block">
+                                <i class="fas fa-file-pdf me-2 text-danger"></i> @item.fn
+                            </a>
+                            <div class="form-check mt-1 ms-4">
+                                <input class="form-check-input" type="checkbox" checked="@item.Vormerken" @onchange="@(e => ToggleVormerken(item, e))" id="chk-doc-@item.id">
+                                <label class="form-check-label small text-muted" for="chk-doc-@item.id">Vormerken für Export</label>
+                            </div>
+                        </div>
                         <AuthorizeView Roles="Admin" Context="docAdmin">
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                 <i class="fas fa-trash"></i>
@@ -444,6 +450,10 @@
                         <input type="date" class="form-control" @bind="d.Born" />
                     </div>
                     <div class="mt-2">
+                        <label>Gestorben</label>
+                        <input type="date" class="form-control" @bind="d.Died" />
+                    </div>
+                    <div class="mt-2">
                         <label>Notiz</label>
                         <textarea class="form-control" rows="3" @bind="d.Note"></textarea>
                     </div>
@@ -469,6 +479,10 @@
                         <input type="date" class="form-control" @bind="s.Born" />
                     </div>
                     <div class="mt-2">
+                        <label>Gestorben</label>
+                        <input type="date" class="form-control" @bind="s.Died" />
+                    </div>
+                    <div class="mt-2">
                         <label>Notiz</label>
                         <textarea class="form-control" rows="3" @bind="s.Note"></textarea>
                     </div>
@@ -492,6 +506,10 @@
                     <div class="mt-2">
                         <label>Geboren</label>
                         <input type="date" class="form-control" @bind="k.Born" />
+                    </div>
+                    <div class="mt-2">
+                        <label>Gestorben</label>
+                        <input type="date" class="form-control" @bind="k.Died" />
                     </div>
                     <div class="mt-2">
                         <label>Notiz</label>
@@ -845,6 +863,15 @@
             // Refresh details view if open? The service returns void, we manually updated lists.
             // But Service.GetDocuments pulls from DB or folder.
             // StateHasChanged handles re-render of the modal content.
+        }
+    }
+
+    private async Task ToggleVormerken(DOC item, ChangeEventArgs e)
+    {
+        if (bool.TryParse(e.Value?.ToString(), out bool val))
+        {
+            await Service.UpdateDocumentVormerken(item.id, val);
+            item.Vormerken = val; // Update UI state locally
         }
     }
 
