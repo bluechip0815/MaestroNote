@@ -542,6 +542,7 @@
             if (result is AiDirigentResponseDto dto)
             {
                 newDirigent.Born = dto.Born;
+                newDirigent.Died = dto.Died;
                 newDirigent.Note = dto.Note;
             }
             else
@@ -571,6 +572,7 @@
             if (result is AiSolistResponseDto dto)
             {
                 newSolist.Born = dto.Born;
+                newSolist.Died = dto.Died;
                 newSolist.Note = dto.Note;
             }
             else
@@ -600,6 +602,7 @@
             if (result is AiKomponistResponseDto dto)
             {
                 newKomponist.Born = dto.Born;
+                newKomponist.Died = dto.Died;
                 newKomponist.Note = dto.Note ?? "";
             }
             else
