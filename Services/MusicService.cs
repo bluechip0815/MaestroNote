@@ -284,7 +284,7 @@ namespace MaestroNotes.Services
             }
             return lst;
         }
-        public async Task<string> SaveFile(int pid, string FileName, byte[] fileBytes, DocumentType type)
+        public async Task<string> SaveFile(int pid, string FileName, byte[] fileBytes, DocumentType type, bool vormerken)
         {
             if (_context is null)
                 return "Database cintext error";
@@ -304,7 +304,8 @@ namespace MaestroNotes.Services
                     FileName = FileName,
                     EncryptedName = efn,
                     DocumentType = type,
-                    MusicRecordId = pid
+                    MusicRecordId = pid,
+                    Vormerken = vormerken
                 };
                 string path = type == DocumentType.Pdf ? GetDocumentPath() : GetImagePath();
                 string fn = Path.Combine(path, document.EncryptedName);
