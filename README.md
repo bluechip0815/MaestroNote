@@ -38,7 +38,12 @@ Die Anwendung bietet umfassende Funktionen zur Dokumentation und Verwaltung musi
 
 ## Datenbank Setup
 
-Die Anwendung verwendet eine MySQL-Datenbank (Version 8.0 oder neuer). Nachfolgend finden Sie die SQL-Statements zum Erstellen der Tabellenstruktur.
+Die Anwendung verwendet eine MySQL-Datenbank (Version 8.0 oder neuer). Die Verbindung zur Datenbank wird in der Datei `appsettings.json` konfiguriert.
+
+**Hinweis zum Connection String:**
+Der in der Vorlage (`hosting/appsettings.json`) enthaltene Connection String ist ein Beispiel für eine lokale Umgebung und enthält keine sensiblen Daten (`Server=localhost;Database=NewMaestro;User=Admin;Password=xx;`). Für den produktiven Einsatz müssen diese Werte (Server, Datenbank, User, Passwort) entsprechend angepasst werden.
+
+Nachfolgend finden Sie die SQL-Statements zum Erstellen der Tabellenstruktur.
 
 ```sql
 -- Tabelle: Users
@@ -188,3 +193,15 @@ MaestroNotes verwendet ein sicheres, passwortloses Login-Verfahren ("Magic Link"
 4.  **Authentifizierung**:
     *   Bei erfolgreicher Prüfung wird das Token als "verwendet" markiert (`IsUsed = 1`).
     *   Ein sicheres Authentifizierungs-Cookie (`MaestroNotesAuth`) wird gesetzt, das den Benutzer für 30 Tage eingeloggt lässt.
+
+## Deployment
+
+### IONOS.DE
+
+Für das Hosting auf IONOS.DE sind spezielle Konfigurationsdateien erforderlich, die im Unterordner `hosting/` bereitgestellt werden.
+
+*   `hosting/appsettings.json`: Enthält die Anwendungskonfiguration, einschließlich Logging, Datenbankverbindung und SMTP-Einstellungen.
+*   `hosting/web.config`: Enthält die Konfiguration für den IIS auf dem IONOS-Server.
+
+**Einrichtung:**
+Kopieren Sie diese beiden Dateien aus dem `hosting/`-Verzeichnis in das Hauptverzeichnis Ihrer Webanwendung auf dem Server. Stellen Sie sicher, dass Sie den `DefaultConnection`-String in der `appsettings.json` mit Ihren tatsächlichen Datenbank-Zugangsdaten aktualisieren.
