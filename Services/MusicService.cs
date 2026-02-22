@@ -245,7 +245,7 @@ namespace MaestroNotes.Services
             }
             return false;
         }
-        public record DOC { public string fn = ""; public int id = 0; public string path = ""; };
+        public record DOC { public string fn = ""; public int id = 0; public string path = ""; public bool Vormerken = false; };
         public List<DOC> GetDocuments(int id)
         {
             return GetAllDocuments(id, DocumentType.Pdf);
@@ -272,7 +272,8 @@ namespace MaestroNotes.Services
                         {
                             fn = d.FileName.Substring(0, d.FileName.LastIndexOf('.')),
                             path = Path.Combine(folder, d.EncryptedName),
-                            id = d.Id
+                            id = d.Id,
+                            Vormerken = d.Vormerken
                         });
                     }
                 }
@@ -322,6 +323,23 @@ namespace MaestroNotes.Services
             {
                 Log.Logger.Error(ex.Message);
                 return ex.Message;
+            }
+        }
+
+        public async Task UpdateDocumentVormerken(int id, bool status)
+        {
+            try
+            {
+                var doc = await _context.Documents.FindAsync(id);
+                if (doc != null)
+                {
+                    doc.Vormerken = status;
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex.Message);
             }
         }
         public async Task<bool> SaveDocuDataSet(Document record)
