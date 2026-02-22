@@ -295,7 +295,13 @@
                     <div class="mb-3 p-2 border rounded">
                         <img src="@item.path" alt="@item.fn" class="img-fluid mb-2" />
                         <div class="d-flex justify-content-between">
-                             <span class="text-muted small">@item.fn</span>
+                             <div>
+                                 <span class="text-muted small d-block">@item.fn</span>
+                                 <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" checked="@item.Vormerken" @onchange="@(e => ToggleVormerken(item, e))" id="chk-img-@item.id">
+                                    <label class="form-check-label small text-muted" for="chk-img-@item.id">Vormerken für Export</label>
+                                </div>
+                             </div>
                              <AuthorizeView Roles="Admin" Context="imgAdmin">
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                     <i class="fas fa-trash"></i>

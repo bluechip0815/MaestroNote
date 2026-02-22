@@ -1,16 +1,37 @@
-﻿@using MaestroNotes.Data
+@using MaestroNotes.Data
 @inject MusicService Service
 @inject IJSRuntime JS
 
 <EditForm Model="@currentRecord">
-    <div style="display: flex;">
-        <p>
-            <b>Datei hochladen:</b><br />
-            <InputFile OnChange="UploadFile" accept="application/pdf, image/jpeg, image/png" />
-        </p>
+    <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div>
+            <b>Datei auswählen:</b><br />
+            <InputFile OnChange="OnInputFileChange" accept="application/pdf, image/jpeg, image/png" />
+        </div>
+
+        @if (!string.IsNullOrEmpty(selectedFileName))
+        {
+             <div class="card p-3">
+                 <p><strong>Ausgewählte Datei:</strong> @selectedFileName</p>
+
+                 <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="chkVormerken" @bind="vormerken">
+                    <label class="form-check-label" for="chkVormerken">
+                        Vormerken für Export
+                    </label>
+                </div>
+
+                 <div>
+                    <button class="btn btn-success" @onclick="StartUpload" disabled="@isUploading">
+                        @if(isUploading) { <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> }
+                        Hochladen
+                    </button>
+                </div>
+            </div>
+        }
     </div>
-    <div style="display: flex;">
-        <button class="btn btn-primary" @onclick="Close">Fertig</button>
+    <div style="display: flex; margin-top: 15px;">
+        <button class="btn btn-secondary" @onclick="Close">Schließen</button>
     </div>
 </EditForm>
 
@@ -27,60 +48,83 @@
     }
 
     private string selectedFileName = "";
-    private byte[]? fileBytes;
     private IBrowserFile? file;
-    private const long MaxFileSize = 1024 * 1024 * 7; // 5 MB limit
-    private async Task UploadFile(InputFileChangeEventArgs e)
+    private const long MaxFileSize = 1024 * 1024 * 7; // 7 MB limit
+    private bool vormerken = false;
+    private bool isUploading = false;
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
     {
+        selectedFileName = "";
+        file = null;
+        vormerken = false;
+
         try
         {
             if (e.FileCount > 0)
             {
-                file = e.GetMultipleFiles()[0];
-                if (file.Size > MaxFileSize)
+                var f = e.GetMultipleFiles()[0];
+                if (f.Size > MaxFileSize)
                 {
                     await JS.InvokeVoidAsync("info", "Datei ist zu groß!");
                     return;
                 }
 
+                file = f;
                 selectedFileName = file.Name;
-                fileBytes = null;
-
-                // Read the file into a byte array
-                using (var ms = new MemoryStream())
-                {
-                    DocumentType tag = selectedFileName.EndsWith("pdf", StringComparison.CurrentCultureIgnoreCase)
-                                            ? DocumentType.Pdf : DocumentType.Image;
-                    
-                    var buffer = new byte[file.Size];
-                    await file.OpenReadStream(MaxFileSize).CopyToAsync(ms);
-                    fileBytes = ms.ToArray();
-                    if (fileBytes is not null)
-                    {
-                        selectedFileName = selectedFileName.Substring(selectedFileName.LastIndexOf('\\') + 1);
-                        string message = await Service.SaveFile(currentRecord.Id, selectedFileName, fileBytes, tag);
-                        await JS.InvokeVoidAsync("info", message);
-                    }
-                    else
-                    {
-                        await JS.InvokeVoidAsync("info", "No data found.");
-                    }
-                }
-            }
-            else
-            {
-                // No files selected
-                selectedFileName = string.Empty;
-                fileBytes = null;
-                await JS.InvokeVoidAsync("info", "Leere Datei");
             }
         }
         catch (Exception ex)
         {
-            selectedFileName = string.Empty;
-            fileBytes = null;
-            await JS.InvokeVoidAsync("info", ex.Message);
+             await JS.InvokeVoidAsync("info", ex.Message);
         }
+    }
+
+    private async Task StartUpload()
+    {
+        if (file == null) return;
+
+        isUploading = true;
         StateHasChanged();
+
+        try
+        {
+            using (var ms = new MemoryStream())
+            {
+                DocumentType tag = selectedFileName.EndsWith("pdf", StringComparison.CurrentCultureIgnoreCase)
+                                        ? DocumentType.Pdf : DocumentType.Image;
+
+                await file.OpenReadStream(MaxFileSize).CopyToAsync(ms);
+                var fileBytes = ms.ToArray();
+
+                if (fileBytes is not null && fileBytes.Length > 0)
+                {
+                    string cleanFileName = selectedFileName;
+                    if (cleanFileName.Contains("\\"))
+                        cleanFileName = cleanFileName.Substring(cleanFileName.LastIndexOf('\\') + 1);
+
+                    string message = await Service.SaveFile(currentRecord.Id, cleanFileName, fileBytes, tag, vormerken);
+                    await JS.InvokeVoidAsync("info", message);
+                    
+                    // Reset
+                    selectedFileName = "";
+                    file = null;
+                    vormerken = false;
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("info", "Leere Datei oder Fehler beim Lesen.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+             await JS.InvokeVoidAsync("info", ex.Message);
+        }
+        finally
+        {
+            isUploading = false;
+            StateHasChanged();
+        }
     }
 }
