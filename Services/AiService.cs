@@ -10,6 +10,7 @@ namespace MaestroNotes.Services
     public class AiDirigentResponseDto
     {
         public DateTime? Born { get; set; }
+        public DateTime? Died { get; set; }
         public string? Note { get; set; }
     }
 
@@ -22,12 +23,14 @@ namespace MaestroNotes.Services
     public class AiSolistResponseDto
     {
         public DateTime? Born { get; set; }
+        public DateTime? Died { get; set; }
         public string? Note { get; set; }
     }
 
     public class AiKomponistResponseDto
     {
         public DateTime? Born { get; set; }
+        public DateTime? Died { get; set; }
         public string? Note { get; set; }
     }
 
@@ -71,7 +74,7 @@ namespace MaestroNotes.Services
             if (itemType.Equals("Dirigent", StringComparison.OrdinalIgnoreCase))
             {
                 targetType = typeof(AiDirigentResponseDto);
-                jsonStructure = JsonSerializer.Serialize(new AiDirigentResponseDto { Born = DateTime.Now, Note = "Example Note" });
+                jsonStructure = JsonSerializer.Serialize(new AiDirigentResponseDto { Born = DateTime.Now, Died = DateTime.Now, Note = "Example Note" });
             }
             else if (itemType.Equals("Orchester", StringComparison.OrdinalIgnoreCase))
             {
@@ -81,12 +84,12 @@ namespace MaestroNotes.Services
             else if (itemType.Equals("Solist", StringComparison.OrdinalIgnoreCase))
             {
                 targetType = typeof(AiSolistResponseDto);
-                jsonStructure = JsonSerializer.Serialize(new AiSolistResponseDto { Born = DateTime.Now, Note = "Example Note" });
+                jsonStructure = JsonSerializer.Serialize(new AiSolistResponseDto { Born = DateTime.Now, Died = DateTime.Now, Note = "Example Note" });
             }
             else if (itemType.Equals("Komponist", StringComparison.OrdinalIgnoreCase))
             {
                 targetType = typeof(AiKomponistResponseDto);
-                jsonStructure = JsonSerializer.Serialize(new AiKomponistResponseDto { Born = DateTime.Now, Note = "Example Note" });
+                jsonStructure = JsonSerializer.Serialize(new AiKomponistResponseDto { Born = DateTime.Now, Died = DateTime.Now, Note = "Example Note" });
             }
             else if (itemType.Equals("Werk", StringComparison.OrdinalIgnoreCase))
             {

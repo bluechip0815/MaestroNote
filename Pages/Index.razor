@@ -1002,21 +1002,21 @@
                     name = $"{d.Vorname} {d.Name}".Trim();
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var dRes = await AiService.RequestAiData(name, "Dirigent") as AiDirigentResponseDto;
-                    if (dRes != null) { d.Born = dRes.Born; d.Note = dRes.Note; success = true; }
+                    if (dRes != null) { d.Born = dRes.Born; d.Died = dRes.Died; d.Note = dRes.Note; success = true; }
                     break;
                 case "Solist":
                     var s = (Solist)EditMasterItem;
                     name = $"{s.Vorname} {s.Name}".Trim();
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var sRes = await AiService.RequestAiData(name, "Solist") as AiSolistResponseDto;
-                    if (sRes != null) { s.Born = sRes.Born; s.Note = sRes.Note; success = true; }
+                    if (sRes != null) { s.Born = sRes.Born; s.Died = sRes.Died; s.Note = sRes.Note; success = true; }
                     break;
                 case "Komponist":
                     var k = (Komponist)EditMasterItem;
                     name = $"{k.Vorname} {k.Name}".Trim();
                     if (string.IsNullOrWhiteSpace(name)) throw new Exception("Name required");
                     var kRes = await AiService.RequestAiData(name, "Komponist") as AiKomponistResponseDto;
-                    if (kRes != null) { k.Born = kRes.Born; k.Note = kRes.Note ?? ""; success = true; }
+                    if (kRes != null) { k.Born = kRes.Born; k.Died = kRes.Died; k.Note = kRes.Note ?? ""; success = true; }
                     break;
                 case "Orchester":
                     var o = (Orchester)EditMasterItem;
@@ -1191,6 +1191,7 @@
                     {
                         var k = (Komponist)(object)item;
                         k.Born = kr.Born;
+                        k.Died = kr.Died;
                         k.Note = kr.Note ?? "";
                         updated = true;
                     }
@@ -1198,6 +1199,7 @@
                     {
                         var d = (Dirigent)(object)item;
                         d.Born = dr.Born;
+                        d.Died = dr.Died;
                         d.Note = dr.Note;
                         updated = true;
                     }
@@ -1205,6 +1207,7 @@
                     {
                         var s = (Solist)(object)item;
                         s.Born = sr.Born;
+                        s.Died = sr.Died;
                         s.Note = sr.Note;
                         updated = true;
                     }
