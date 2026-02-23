@@ -92,6 +92,58 @@ namespace MaestroNotes.Services
             }
         }
 
+        // User Management
+        public List<User> GetAllUsers()
+        {
+            return _context.Users.AsNoTracking().OrderBy(u => u.Name).ToList();
+        }
+
+        public async Task<bool> SaveUser(User user)
+        {
+            try
+            {
+                if (user.Id == 0)
+                    _context.Users.Add(user);
+                else
+                {
+                    var existing = await _context.Users.FindAsync(user.Id);
+                    if (existing != null)
+                    {
+                        existing.Name = user.Name;
+                        existing.Email = user.Email;
+                        existing.UserLevel = user.UserLevel;
+                    }
+                }
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex.Message);
+                return false;
+            }
+        }
+
+        public async Task<bool> DeleteUser(int id)
+        {
+            try
+            {
+                var user = await _context.Users.FindAsync(id);
+                if (user != null)
+                {
+                    _context.Users.Remove(user);
+                    await _context.SaveChangesAsync();
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex.Message);
+                return false;
+            }
+        }
+
         public List<MusicRecord> GetAllMusicRecords()
         {
             return _context.MusicRecords.ToList();

@@ -1,0 +1,12 @@
+2026-02-23 19:47:13.411 +00:00 [INF] Starting web host
+2026-02-23 19:47:14.745 +00:00 [INF] Seeded default Admin user.
+2026-02-23 19:47:14.911 +00:00 [WRN] No XML encryptor configured. Key {a94730f9-b6a4-4a0a-a132-6b480e466d14} may be persisted to storage in unencrypted form.
+2026-02-23 19:47:15.313 +00:00 [WRN] The ASP.NET Core developer certificate is not trusted. For information about trusting the ASP.NET Core developer certificate, see https://aka.ms/aspnet/https-trust-dev-cert.
+2026-02-23 19:48:44.140 +00:00 [INF] MusicService constructed
+2026-02-23 19:48:45.563 +00:00 [INF] MusicService constructed
+2026-02-23 19:49:47.817 +00:00 [INF] MusicService constructed
+2026-02-23 19:49:47.999 +00:00 [INF] MusicService constructed
+2026-02-23 19:49:49.329 +00:00 [INF] [MOCK EMAIL] To: admin@example.com, Link: https://localhost:7121/auth/verify?token=e62dcf74-c4b6-46d2-b6a5-c6aaffded04c
+2026-02-23 19:49:54.572 +00:00 [INF] MusicService constructed
+2026-02-23 19:49:54.713 +00:00 [INF] MusicService constructed
+2026-02-23 19:49:55.270 +00:00 [INF] MusicService constructed
