@@ -117,6 +117,10 @@
                     <ul class="dropdown-menu" aria-labelledby="dropdownSpecials">
                         <li><a class="dropdown-item" role="button" @onclick="OpenAiFillModal">KI Vervollständigen</a></li>
                         <li><a class="dropdown-item" role="button" @onclick="OpenExportModal">Export</a></li>
+                        <AuthorizeView Roles="Admin" Context="userAdminContext">
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" role="button" @onclick="OpenUserListModal">Benutzerverwaltung</a></li>
+                        </AuthorizeView>
                     </ul>
                 </div>
 
@@ -640,6 +644,73 @@
             </div>
         }
     </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="Benutzerverwaltung" Show="@ShowUserListModal" OnClose="@CloseUserListModal" ShowFooter="false">
+    <ChildContent>
+        <div class="mb-2 text-end">
+            <button class="btn btn-primary btn-sm" @onclick="OpenUserAddModal">
+                <i class="fas fa-plus"></i> Neuer Benutzer
+            </button>
+        </div>
+        <div style="max-height: 400px; overflow: auto; background-color: white;">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Rolle</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in UserList)
+                    {
+                        <tr>
+                            <td>@user.Name</td>
+                            <td>@user.Email</td>
+                            <td>@user.UserLevel</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OpenUserEditModal(user)">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteUser(user)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="Benutzer bearbeiten" Show="@ShowUserEditModal" OnClose="@CloseUserEditModal" ShowFooter="true">
+    <ChildContent>
+        @if (EditUserItem != null)
+        {
+            <div class="mb-3">
+                <label class="form-label">Name</label>
+                <input type="text" class="form-control" @bind="EditUserItem.Name" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" @bind="EditUserItem.Email" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Rolle</label>
+                <select class="form-select" @bind="EditUserItem.UserLevel">
+                    <option value="@UserLevel.Viewer">Viewer</option>
+                    <option value="@UserLevel.Admin">Admin</option>
+                </select>
+            </div>
+        }
+    </ChildContent>
+    <FooterContent>
+        <button class="btn btn-secondary" @onclick="() => CloseUserEditModal(false)">Abbrechen</button>
+        <button class="btn btn-primary" @onclick="SaveUser">Speichern</button>
+    </FooterContent>
 </ModalDialog>
 
 @code {
@@ -1291,5 +1362,109 @@
             await ShowInfo("Export angestoßen. Bitte prüfen Sie Ihre Emails.");
         else
             await ShowInfo("Keine Daten für Export oder Fehler.");
+    }
+
+    // --- User Management ---
+    private bool ShowUserListModal = false;
+    private List<User> UserList = new();
+
+    private void OpenUserListModal()
+    {
+        LoadUserList();
+        ShowUserListModal = true;
+    }
+
+    private void LoadUserList()
+    {
+        UserList = Service.GetAllUsers();
+    }
+
+    private Task CloseUserListModal(bool result)
+    {
+        ShowUserListModal = false;
+        return Task.CompletedTask;
+    }
+
+    private bool ShowUserEditModal = false;
+    private User? EditUserItem;
+
+    private void OpenUserAddModal()
+    {
+        EditUserItem = new User();
+        ShowUserEditModal = true;
+    }
+
+    private void OpenUserEditModal(User user)
+    {
+        // Clone to avoid direct editing in list
+        var options = new JsonSerializerOptions { ReferenceHandler = ReferenceHandler.IgnoreCycles };
+        var json = JsonSerializer.Serialize(user, options);
+        EditUserItem = JsonSerializer.Deserialize<User>(json, options);
+        ShowUserEditModal = true;
+    }
+
+    private Task CloseUserEditModal(bool result)
+    {
+        ShowUserEditModal = false;
+        EditUserItem = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveUser()
+    {
+        if (EditUserItem != null)
+        {
+            // Validation
+            if (string.IsNullOrWhiteSpace(EditUserItem.Name))
+            {
+                await JS.InvokeVoidAsync("alert", "Name ist erforderlich.");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(EditUserItem.Email) || !System.Text.RegularExpressions.Regex.IsMatch(EditUserItem.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+            {
+                await JS.InvokeVoidAsync("alert", "Gültige Email-Adresse ist erforderlich.");
+                return;
+            }
+
+            bool success = await Service.SaveUser(EditUserItem);
+            if (success)
+            {
+                LoadUserList();
+                ShowUserEditModal = false;
+                EditUserItem = null;
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "Fehler beim Speichern des Benutzers.");
+            }
+        }
+    }
+
+    private async Task DeleteUser(User user)
+    {
+        // Prevent self-deletion
+        if (AuthenticationStateTask != null)
+        {
+            var authState = await AuthenticationStateTask;
+            if (authState.User.Identity?.Name == user.Name)
+            {
+                await JS.InvokeVoidAsync("alert", "Sie können Ihren eigenen Benutzer nicht löschen.");
+                return;
+            }
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>("confirmDeletion", $"Soll der Benutzer '{user.Name}' wirklich gelöscht werden?");
+        if (confirmed)
+        {
+            bool success = await Service.DeleteUser(user.Id);
+            if (success)
+            {
+                LoadUserList();
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "Fehler beim Löschen des Benutzers.");
+            }
+        }
     }
 }
