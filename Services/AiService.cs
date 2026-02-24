@@ -1,12 +1,25 @@
 using System;
 using System.Threading.Tasks;
+using MaestroNotes.Data;
 using MaestroNotes.Data.Ai;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace MaestroNotes.Services
 {
+    public class AiKonzertResponseDto
+    {
+        public string? Dirigent { get; set; }
+        public string? Orchester { get; set; }
+
+        [JsonPropertyName("Komponist: Werk")]
+        public string[]? KomponistWerk { get; set; }
+
+        public string[]? Solist { get; set; }
+    }
+
     public class AiDirigentResponseDto
     {
         public DateTime? Born { get; set; }
@@ -49,18 +62,162 @@ namespace MaestroNotes.Services
         private readonly IAiProvider _aiProvider;
         private readonly AiSettings _settings;
         private readonly ILogger<AiService> _logger;
+        private readonly MusicService _musicService;
 
-        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings, ILogger<AiService> logger)
+        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings, ILogger<AiService> logger, MusicService musicService)
         {
             _aiProvider = aiProvider;
             _settings = settings.Value;
             _logger = logger;
+            _musicService = musicService;
         }
 
-        public Task ExecuteConcertCheck(string location, DateTime date)
+        public async Task<MusicRecord?> ExecuteConcertCheck(string location, DateTime date)
         {
             _logger.LogInformation($"Checking concert for {location} on {date}");
-            return Task.CompletedTask;
+
+            if (!_settings.Prompts.TryGetValue("Konzert", out var promptSettings))
+            {
+                _logger.LogError("No prompt configuration found for 'Konzert'");
+                return null;
+            }
+
+            string userPrompt = string.Format(promptSettings.User, date.ToString("yyyy-MM-dd"), location);
+            string systemPrompt = _settings.System;
+
+            // Expected JSON structure
+            var dummyDto = new AiKonzertResponseDto
+            {
+                Dirigent = "Name",
+                Orchester = "Name",
+                KomponistWerk = new[] { "Composer: Work" },
+                Solist = new[] { "Name" }
+            };
+            string jsonStructure = JsonSerializer.Serialize(dummyDto);
+
+            userPrompt += $"\n\nPlease return the response as a raw JSON object strictly matching this structure:\n{jsonStructure}";
+
+            try
+            {
+                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, _settings.Model);
+                jsonResponse = StripMarkdown(jsonResponse);
+
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var data = JsonSerializer.Deserialize<AiKonzertResponseDto>(jsonResponse, options);
+
+                if (data == null) return null;
+
+                // Create MusicRecord
+                int startYear = date.Month >= 8 ? date.Year : date.Year - 1;
+                var record = new MusicRecord
+                {
+                    Datum = date,
+                    Spielsaison = $"{startYear}/{(startYear + 1) % 100}",
+                    Bezeichnung = "Konzert"
+                };
+
+                // Ort
+                if (!string.IsNullOrEmpty(location))
+                {
+                    var ort = _musicService.GetAllOrte().FirstOrDefault(o => o.Name.Equals(location, StringComparison.OrdinalIgnoreCase));
+                    if (ort == null)
+                    {
+                        ort = new Ort { Name = location };
+                        await _musicService.AddOrt(ort);
+                    }
+                    record.OrtEntity = ort;
+                    record.OrtId = ort.Id;
+                }
+
+                // Dirigent
+                if (!string.IsNullOrEmpty(data.Dirigent))
+                {
+                    var dir = _musicService.GetAllDirigenten().FirstOrDefault(d => d.Name.Equals(data.Dirigent, StringComparison.OrdinalIgnoreCase));
+                    if (dir == null)
+                    {
+                        dir = new Dirigent { Name = data.Dirigent };
+                        await _musicService.AddDirigent(dir);
+                    }
+                    record.Dirigent = dir;
+                    record.DirigentId = dir.Id;
+                }
+
+                // Orchester
+                if (!string.IsNullOrEmpty(data.Orchester))
+                {
+                    var orch = _musicService.GetAllOrchester().FirstOrDefault(o => o.Name.Equals(data.Orchester, StringComparison.OrdinalIgnoreCase));
+                    if (orch == null)
+                    {
+                        orch = new Orchester { Name = data.Orchester };
+                        await _musicService.AddOrchester(orch);
+                    }
+                    record.Orchester = orch;
+                    record.OrchesterId = orch.Id;
+                }
+
+                // Solisten
+                if (data.Solist != null)
+                {
+                    foreach (var sName in data.Solist)
+                    {
+                        if (string.IsNullOrWhiteSpace(sName)) continue;
+                        var solist = _musicService.GetAllSolisten().FirstOrDefault(s => s.Name.Equals(sName, StringComparison.OrdinalIgnoreCase));
+                        if (solist == null)
+                        {
+                            solist = new Solist { Name = sName };
+                            await _musicService.AddSolist(solist);
+                        }
+                        record.Solisten.Add(solist);
+                    }
+                }
+
+                // Werke (Komponist: Werk)
+                if (data.KomponistWerk != null)
+                {
+                    foreach (var kw in data.KomponistWerk)
+                    {
+                        if (string.IsNullOrWhiteSpace(kw)) continue;
+
+                        string kName = "";
+                        string wName = kw;
+
+                        if (kw.Contains(":"))
+                        {
+                            var parts = kw.Split(new[] { ':' }, 2);
+                            kName = parts[0].Trim();
+                            wName = parts[1].Trim();
+                        }
+
+                        Komponist? komponist = null;
+                        if (!string.IsNullOrEmpty(kName))
+                        {
+                            komponist = _musicService.GetAllKomponisten().FirstOrDefault(k => k.Name.Equals(kName, StringComparison.OrdinalIgnoreCase));
+                            if (komponist == null)
+                            {
+                                komponist = new Komponist { Name = kName };
+                                await _musicService.AddKomponist(komponist);
+                            }
+                        }
+
+                        var werk = _musicService.GetAllWerke().FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.Komponist == komponist));
+                        if (werk == null)
+                        {
+                            werk = new Werk { Name = wName, Komponist = komponist };
+                            await _musicService.AddWerk(werk);
+                        }
+
+                        record.Werke.Add(werk);
+                    }
+                }
+
+                await _musicService.SaveDataSet(record);
+                return record;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing concert check");
+                return null;
+            }
         }
 
         public async Task<object> RequestAiData(string name, string itemType)
