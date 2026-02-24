@@ -109,6 +109,13 @@ namespace MaestroNotes.Services
                     var existing = await _context.Users.FindAsync(user.Id);
                     if (existing != null)
                     {
+                        if (existing.UserLevel == UserLevel.Admin && user.UserLevel != UserLevel.Admin)
+                        {
+                            int adminCount = await _context.Users.CountAsync(u => u.UserLevel == UserLevel.Admin);
+                            if (adminCount <= 1)
+                                return false;
+                        }
+
                         existing.Name = user.Name;
                         existing.Email = user.Email;
                         existing.UserLevel = user.UserLevel;
@@ -131,6 +138,13 @@ namespace MaestroNotes.Services
                 var user = await _context.Users.FindAsync(id);
                 if (user != null)
                 {
+                    if (user.UserLevel == UserLevel.Admin)
+                    {
+                        int adminCount = await _context.Users.CountAsync(u => u.UserLevel == UserLevel.Admin);
+                        if (adminCount <= 1)
+                            return false;
+                    }
+
                     _context.Users.Remove(user);
                     await _context.SaveChangesAsync();
                     return true;
