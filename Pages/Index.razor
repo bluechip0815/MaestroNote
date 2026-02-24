@@ -31,7 +31,7 @@
         }
         else
         {
-            <div class="search-container" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 20px;">
+            <div class="search-container d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 mb-3">
                 <select class="form-select" style="width: auto;" @bind="searchCategory">
                     @foreach (var cat in searchCategories)
                     {
@@ -151,7 +151,7 @@
                             <li><a class="dropdown-item" role="button" @onclick='() => OpenMasterList("Ort")'>Ort</a></li>
                         </ul>
                     </div>
-                    <button class="btn btn-primary" @onclick="() => AddNew()" title="Neuer Eintrag">
+                    <button class="btn btn-primary d-none d-md-inline-block" @onclick="() => AddNew()" title="Neuer Eintrag">
                         <i class="fas fa-plus"></i>
                     </button>
                 </AuthorizeView>

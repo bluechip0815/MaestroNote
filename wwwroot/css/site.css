@@ -149,6 +149,8 @@ a:hover, .btn-link:hover {
     }
 
     .modern-table tbody tr {
+        display: flex;
+        flex-direction: column;
         border: 1px solid #ccc;
         margin-bottom: 1rem;
         border-radius: 8px;
