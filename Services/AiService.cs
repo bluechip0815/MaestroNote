@@ -57,6 +57,12 @@ namespace MaestroNotes.Services
             _logger = logger;
         }
 
+        public Task ExecuteConcertCheck(string location, DateTime date)
+        {
+            _logger.LogInformation($"Checking concert for {location} on {date}");
+            return Task.CompletedTask;
+        }
+
         public async Task<object> RequestAiData(string name, string itemType)
         {
             if (!_settings.Prompts.TryGetValue(itemType, out var promptSettings))
