@@ -616,6 +616,25 @@ namespace MaestroNotes.Services
                 .ToList();
         }
 
+        public List<string> GetLocationsByCount()
+        {
+            try
+            {
+                return _context.MusicRecords
+                    .Where(m => m.OrtEntity != null)
+                    .GroupBy(m => m.OrtEntity!.Name)
+                    .Select(g => new { Name = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.Count)
+                    .Select(x => x.Name)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Error in GetLocationsByCount");
+                return new List<string>();
+            }
+        }
+
         private List<string>? _spielSaisonCache;
 
         public List<string> GetSpielSaisonList()

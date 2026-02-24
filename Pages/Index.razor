@@ -110,7 +110,7 @@
 
                 <button class="btn btn-secondary" @onclick="RefreshList">Zeige</button>
 
-                <div class="dropdown d-inline-block ms-2">
+                <div class="dropdown d-none d-md-inline-block ms-2">
                     <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownSpecials" data-bs-toggle="dropdown" aria-expanded="false">
                         Specials
                     </button>
@@ -124,9 +124,13 @@
                     </ul>
                 </div>
 
-                <span>@GetNumber() Datensätze</span>
+                <button class="btn d-md-none ms-2" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="OpenConcertLocationModal">
+                    Konzert heute
+                </button>
 
-                <select id="number" value="@selectedLimit" @onchange="Display" class="form-select" style="width:auto;">
+                <span class="d-none d-md-inline">@GetNumber() Datensätze</span>
+
+                <select id="number" value="@selectedLimit" @onchange="Display" class="form-select d-none d-md-inline-block" style="width:auto;">
                     @foreach (var opt in limitOptions)
                     {
                         <option value="@opt.Key">@opt.Value</option>
@@ -346,6 +350,19 @@
         {
              <Upload currentRecord="@UploadRecord" CloseUploadCallback="@CloseUploadCallback" />
         }
+    </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="Konzert heute: Ort wählen" Show="@ShowConcertLocationModal" OnClose="@CloseConcertLocationModal" ShowFooter="false">
+    <ChildContent>
+        <div class="d-grid gap-2">
+            @foreach (var loc in ConcertLocations)
+            {
+                <button class="btn btn-outline-primary btn-lg py-3" @onclick="() => SelectConcertLocation(loc)">
+                    @loc
+                </button>
+            }
+        </div>
     </ChildContent>
 </ModalDialog>
 
@@ -901,6 +918,33 @@
         }
         ShowDeleteModal = false;
         DeleteRecordId = 0;
+    }
+
+    // --- Concert Check Modal ---
+    private bool ShowConcertLocationModal = false;
+    private List<string> ConcertLocations = new();
+
+    private void OpenConcertLocationModal()
+    {
+        ConcertLocations = Service.GetLocationsByCount();
+        ShowConcertLocationModal = true;
+    }
+
+    private Task CloseConcertLocationModal(bool result)
+    {
+        ShowConcertLocationModal = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task SelectConcertLocation(string location)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Soll eine KI-Prüfung für Konzerte in '{location}' durchgeführt werden?");
+        if (confirmed)
+        {
+            await AiService.ExecuteConcertCheck(location, DateTime.Now);
+            ShowConcertLocationModal = false;
+            await ShowInfo($"KI-Prüfung für {location} gestartet (Simulation).");
+        }
     }
 
     // --- Edit (Full) ---
