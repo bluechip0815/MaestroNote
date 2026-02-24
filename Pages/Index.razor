@@ -133,7 +133,7 @@
                     }
                 </select>
 
-                <AuthorizeView Roles="Admin" Context="adminContext">
+                <AuthorizeView Roles="Admin, Operator" Context="adminContext">
                     <div class="dropdown d-inline-block me-2">
                         <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMaster" data-bs-toggle="dropdown" aria-expanded="false">
                             Stammdaten
@@ -200,7 +200,7 @@
                                                 </a>
                                             </li>
 
-                                            <AuthorizeView Roles="Admin" Context="adminItemContext">
+                                            <AuthorizeView Roles="Admin, Operator" Context="adminItemContext">
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
@@ -285,7 +285,7 @@
                                 <label class="form-check-label small text-muted" for="chk-doc-@item.id">Vormerken für Export</label>
                             </div>
                         </div>
-                        <AuthorizeView Roles="Admin" Context="docAdmin">
+                        <AuthorizeView Roles="Admin, Operator" Context="docAdmin">
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -306,7 +306,7 @@
                                     <label class="form-check-label small text-muted" for="chk-img-@item.id">Vormerken für Export</label>
                                 </div>
                              </div>
-                             <AuthorizeView Roles="Admin" Context="imgAdmin">
+                             <AuthorizeView Roles="Admin, Operator" Context="imgAdmin">
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -702,6 +702,7 @@
                 <label class="form-label">Rolle</label>
                 <select class="form-select" @bind="EditUserItem.UserLevel">
                     <option value="@UserLevel.Viewer">Viewer</option>
+                    <option value="@UserLevel.Operator">Operator</option>
                     <option value="@UserLevel.Admin">Admin</option>
                 </select>
             </div>
