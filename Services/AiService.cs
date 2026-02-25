@@ -72,9 +72,9 @@ namespace MaestroNotes.Services
             _musicService = musicService;
         }
 
-        public async Task<MusicRecord?> ExecuteConcertCheck(string location, DateTime date)
+        public async Task<AiKonzertResponseDto?> GetConcertPreview(string location, DateTime date)
         {
-            _logger.LogInformation($"Checking concert for {location} on {date}");
+            _logger.LogInformation($"Checking concert preview for {location} on {date}");
 
             if (!_settings.Prompts.TryGetValue("Konzert", out var promptSettings))
             {
@@ -99,14 +99,30 @@ namespace MaestroNotes.Services
 
             try
             {
-                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, _settings.Model);
+                // Use ModelReasoning if available, otherwise fallback to default Model
+                string modelToUse = !string.IsNullOrWhiteSpace(_settings.ModelReasoning) ? _settings.ModelReasoning : _settings.Model;
+
+                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, modelToUse);
                 jsonResponse = StripMarkdown(jsonResponse);
 
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var data = JsonSerializer.Deserialize<AiKonzertResponseDto>(jsonResponse, options);
 
-                if (data == null) return null;
+                return data;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing concert check preview");
+                return null;
+            }
+        }
 
+        public async Task<MusicRecord?> SaveConcertData(AiKonzertResponseDto data, string location, DateTime date)
+        {
+             if (data == null) return null;
+
+             try
+             {
                 // Create MusicRecord
                 int startYear = date.Month >= 8 ? date.Year : date.Year - 1;
                 var record = new MusicRecord
@@ -212,12 +228,19 @@ namespace MaestroNotes.Services
 
                 await _musicService.SaveDataSet(record);
                 return record;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error executing concert check");
-                return null;
-            }
+             }
+             catch (Exception ex)
+             {
+                 _logger.LogError(ex, "Error saving concert data");
+                 throw;
+             }
+        }
+
+        public async Task<MusicRecord?> ExecuteConcertCheck(string location, DateTime date)
+        {
+            var data = await GetConcertPreview(location, date);
+            if (data == null) return null;
+            return await SaveConcertData(data, location, date);
         }
 
         public async Task<object> RequestAiData(string name, string itemType)

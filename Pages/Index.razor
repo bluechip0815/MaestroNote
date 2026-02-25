@@ -731,11 +731,81 @@
     </FooterContent>
 </ModalDialog>
 
+<ModalDialog Title="Konzert Vorschau" Show="@ShowConcertPreviewModal" OnClose="@CloseConcertPreviewModal" ShowFooter="false">
+    <ChildContent>
+        @if (IsConcertPreviewLoading)
+        {
+            <div class="text-center my-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Analysiere Konzertdaten...</p>
+            </div>
+        }
+        else if (ConcertPreviewData != null)
+        {
+            <div class="mb-3">
+                <h6>Gefundene Werke für @ConcertPreviewLocation:</h6>
+                <ul class="list-group">
+                    @if (ConcertPreviewData.KomponistWerk != null && ConcertPreviewData.KomponistWerk.Length > 0)
+                    {
+                        foreach (var item in ConcertPreviewData.KomponistWerk)
+                        {
+                            <li class="list-group-item">@item</li>
+                        }
+                    }
+                    else
+                    {
+                        <li class="list-group-item text-muted">Keine Werke gefunden.</li>
+                    }
+                </ul>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-secondary" @onclick="() => CloseConcertPreviewModal(false)">Abbrechen</button>
+                <button class="btn btn-primary" @onclick="SaveConcertPreview">Eintragen</button>
+            </div>
+        }
+        else
+        {
+            <p>Keine Daten gefunden.</p>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                 <button class="btn btn-secondary" @onclick="() => CloseConcertPreviewModal(false)">Schließen</button>
+            </div>
+        }
+    </ChildContent>
+</ModalDialog>
+
 @code {
     private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
     private int selectedLimit = 5;
 
     private const string AiErrorMessage = "KI konnte leider keine Antwort finden";
+
+    // Concert Preview State
+    private bool ShowConcertPreviewModal = false;
+    private AiKonzertResponseDto? ConcertPreviewData;
+    private string ConcertPreviewLocation = "";
+    private DateTime ConcertPreviewDate;
+    private bool IsConcertPreviewLoading = false;
+
+    private Task CloseConcertPreviewModal(bool result)
+    {
+        ShowConcertPreviewModal = false;
+        ConcertPreviewData = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveConcertPreview()
+    {
+        if (ConcertPreviewData != null)
+        {
+             await AiService.SaveConcertData(ConcertPreviewData, ConcertPreviewLocation, ConcertPreviewDate);
+             ShowConcertPreviewModal = false;
+             ConcertPreviewData = null;
+             await ShowInfo($"Konzert in {ConcertPreviewLocation} wurde eingetragen.");
+             RefreshList();
+        }
+    }
 
     // Search properties
     private List<string> searchCategories = new() { "Werk", "Komponist", "Dirigent", "Ort", "Solist", "Orchester", "Note", "Datum", "Saisson" };
@@ -938,13 +1008,23 @@
 
     private async Task SelectConcertLocation(string location)
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Soll eine KI-Prüfung für Konzerte in '{location}' durchgeführt werden?");
-        if (confirmed)
+        ConcertPreviewLocation = location;
+        ConcertPreviewDate = DateTime.Now;
+        ShowConcertLocationModal = false;
+
+        IsConcertPreviewLoading = true;
+        ShowConcertPreviewModal = true;
+        StateHasChanged();
+
+        ConcertPreviewData = await AiService.GetConcertPreview(ConcertPreviewLocation, ConcertPreviewDate);
+        IsConcertPreviewLoading = false;
+
+        if (ConcertPreviewData == null)
         {
-            await AiService.ExecuteConcertCheck(location, DateTime.Now);
-            ShowConcertLocationModal = false;
-            await ShowInfo($"KI-Prüfung für {location} gestartet (Simulation).");
+            ShowConcertPreviewModal = false;
+            await ShowInfo(AiErrorMessage);
         }
+        StateHasChanged();
     }
 
     // --- Edit (Full) ---
