@@ -10,6 +10,7 @@ namespace MaestroNotes.Data.Ai
         public string ModelReasoning { get; set; } = "";
         public string Proxy { get; set; } = "";// Optional proxy URL
         public bool BypassLocal { get; set; } = false;
+        public bool ListModels { get; set; } = false;
         public Dictionary<string, AiPromptSettings> Prompts { get; set; } = new();
     }
 

@@ -4,6 +4,7 @@ using MaestroNotes.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Logging;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,12 +48,13 @@ builder.Services.AddScoped<IAiProvider>(sp =>
 {
     var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AiSettings>>().Value;
     var httpClient = HttpClientFactory.Create(settings);
+    var logger = sp.GetRequiredService<ILogger<OpenAiProvider>>();
 
     return settings.Provider.ToLower() switch
     {
         "gemini" => new GeminiProvider(httpClient, settings.ApiKey, settings.ProviderUrl),
         "anthropic" => new AnthropicProvider(httpClient, settings.ApiKey, settings.ProviderUrl),
-        "chatgpt" or _ => new OpenAiProvider(httpClient, settings.ApiKey, settings.ProviderUrl),
+        "chatgpt" or _ => new OpenAiProvider(httpClient, settings.ApiKey, settings.ProviderUrl, logger, settings.ListModels),
     };
 });
 
