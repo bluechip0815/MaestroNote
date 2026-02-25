@@ -111,15 +111,32 @@ namespace MaestroNotes.Data.Ai
 
                 if (endpointType == ModelEndpointType.Responses)
                 {
-                    // Parse response: output[0].content[0].text
-                    if (doc.RootElement.TryGetProperty("output", out var outputElement) && outputElement.GetArrayLength() > 0)
+                    // Parse response: find element with type="message", then extract content[0].text
+                    if (doc.RootElement.TryGetProperty("output", out var outputElement) && outputElement.ValueKind == JsonValueKind.Array)
                     {
-                        var firstOutput = outputElement[0];
-                        if (firstOutput.TryGetProperty("content", out var contentElement) && contentElement.GetArrayLength() > 0)
+                        foreach (var item in outputElement.EnumerateArray())
                         {
-                            if (contentElement[0].TryGetProperty("text", out var textElement))
+                            if (item.TryGetProperty("type", out var typeElement) && typeElement.ValueKind == JsonValueKind.String && typeElement.GetString() == "message")
                             {
-                                resultText = textElement.GetString();
+                                if (item.TryGetProperty("content", out var contentElement) && contentElement.ValueKind == JsonValueKind.Array)
+                                {
+                                    foreach (var contentItem in contentElement.EnumerateArray())
+                                    {
+                                        if (contentItem.TryGetProperty("text", out var textElement))
+                                        {
+                                            resultText = textElement.GetString();
+                                            if (!string.IsNullOrEmpty(resultText))
+                                            {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(resultText))
+                            {
+                                break;
                             }
                         }
                     }
