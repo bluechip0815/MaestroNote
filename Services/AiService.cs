@@ -135,7 +135,7 @@ namespace MaestroNotes.Services
                 // Ort
                 if (!string.IsNullOrEmpty(location))
                 {
-                    var ort = _musicService.GetAllOrte().FirstOrDefault(o => o.Name.Equals(location, StringComparison.OrdinalIgnoreCase));
+                    var ort = _musicService.GetAllOrte().FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, location));
                     if (ort == null)
                     {
                         ort = new Ort { Name = location };
@@ -148,7 +148,7 @@ namespace MaestroNotes.Services
                 // Dirigent
                 if (!string.IsNullOrEmpty(data.Dirigent))
                 {
-                    var dir = _musicService.GetAllDirigenten().FirstOrDefault(d => d.Name.Equals(data.Dirigent, StringComparison.OrdinalIgnoreCase));
+                    var dir = _musicService.GetAllDirigenten().FirstOrDefault(d => FuzzyStringMatcher.IsMatch(d.Name, data.Dirigent));
                     if (dir == null)
                     {
                         dir = new Dirigent { Name = data.Dirigent };
@@ -161,7 +161,7 @@ namespace MaestroNotes.Services
                 // Orchester
                 if (!string.IsNullOrEmpty(data.Orchester))
                 {
-                    var orch = _musicService.GetAllOrchester().FirstOrDefault(o => o.Name.Equals(data.Orchester, StringComparison.OrdinalIgnoreCase));
+                    var orch = _musicService.GetAllOrchester().FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, data.Orchester));
                     if (orch == null)
                     {
                         orch = new Orchester { Name = data.Orchester };
@@ -177,7 +177,7 @@ namespace MaestroNotes.Services
                     foreach (var sName in data.Solist)
                     {
                         if (string.IsNullOrWhiteSpace(sName)) continue;
-                        var solist = _musicService.GetAllSolisten().FirstOrDefault(s => s.Name.Equals(sName, StringComparison.OrdinalIgnoreCase));
+                        var solist = _musicService.GetAllSolisten().FirstOrDefault(s => FuzzyStringMatcher.IsMatch(s.Name, sName));
                         if (solist == null)
                         {
                             solist = new Solist { Name = sName };
@@ -207,7 +207,7 @@ namespace MaestroNotes.Services
                         Komponist? komponist = null;
                         if (!string.IsNullOrEmpty(kName))
                         {
-                            komponist = _musicService.GetAllKomponisten().FirstOrDefault(k => k.Name.Equals(kName, StringComparison.OrdinalIgnoreCase));
+                            komponist = _musicService.GetAllKomponisten().FirstOrDefault(k => FuzzyStringMatcher.IsMatch(k.Name, kName));
                             if (komponist == null)
                             {
                                 komponist = new Komponist { Name = kName };
