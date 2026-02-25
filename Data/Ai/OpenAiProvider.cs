@@ -64,6 +64,10 @@ namespace MaestroNotes.Data.Ai
                     var requestBody = new
                     {
                         model = model,
+                        tools = new[] 
+                        {
+                            new { type = "web_search" }
+                        },
                         instructions = systemPrompt,
                         input = new[]
                         {
@@ -112,32 +116,46 @@ namespace MaestroNotes.Data.Ai
                 if (endpointType == ModelEndpointType.Responses)
                 {
                     // Parse response: find element with type="message", then extract content[0].text
-                    if (doc.RootElement.TryGetProperty("output", out var outputElement) && outputElement.ValueKind == JsonValueKind.Array)
+                    if (doc.RootElement.TryGetProperty("output", out var outputElement) &&
+                        outputElement.ValueKind == JsonValueKind.Array)
                     {
                         foreach (var item in outputElement.EnumerateArray())
                         {
-                            if (item.TryGetProperty("type", out var typeElement) && typeElement.ValueKind == JsonValueKind.String && typeElement.GetString() == "message")
+                            if (!item.TryGetProperty("type", out var typeElement) ||
+                                typeElement.ValueKind != JsonValueKind.String ||
+                                typeElement.GetString() != "message")
                             {
-                                if (item.TryGetProperty("content", out var contentElement) && contentElement.ValueKind == JsonValueKind.Array)
+                                continue;
+                            }
+
+                            if (!item.TryGetProperty("content", out var contentElement) ||
+                                contentElement.ValueKind != JsonValueKind.Array)
+                            {
+                                continue;
+                            }
+
+                            foreach (var contentItem in contentElement.EnumerateArray())
+                            {
+                                // optional aber empfohlen: nur Text-Blöcke nehmen
+                                if (contentItem.TryGetProperty("type", out var contentType) &&
+                                    contentType.ValueKind == JsonValueKind.String)
                                 {
-                                    foreach (var contentItem in contentElement.EnumerateArray())
-                                    {
-                                        if (contentItem.TryGetProperty("text", out var textElement))
-                                        {
-                                            resultText = textElement.GetString();
-                                            if (!string.IsNullOrEmpty(resultText))
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
+                                    var ct = contentType.GetString();
+                                    if (ct != "output_text" && ct != "text")
+                                        continue;
+                                }
+
+                                if (contentItem.TryGetProperty("text", out var textElement) &&
+                                    textElement.ValueKind == JsonValueKind.String)
+                                {
+                                    resultText = textElement.GetString();
+                                    if (!string.IsNullOrWhiteSpace(resultText))
+                                        break;
                                 }
                             }
 
-                            if (!string.IsNullOrEmpty(resultText))
-                            {
+                            if (!string.IsNullOrWhiteSpace(resultText))
                                 break;
-                            }
                         }
                     }
                 }
