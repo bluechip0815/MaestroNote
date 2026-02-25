@@ -7,6 +7,7 @@ namespace MaestroNotes.Data.Ai
         public string ProviderUrl { get; set; } = "";
         public string ApiKey { get; set; } = "";
         public string Model { get; set; } = "";
+        public string ModelReasoning { get; set; } = "";
         public string Proxy { get; set; } = "";// Optional proxy URL
         public bool BypassLocal { get; set; } = false;
         public Dictionary<string, AiPromptSettings> Prompts { get; set; } = new();
