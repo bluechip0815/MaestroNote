@@ -19,7 +19,7 @@ namespace MaestroNotes.Data.Ai
             _baseUrl = string.IsNullOrEmpty(baseUrl) ? "https://api.anthropic.com/v1" : baseUrl.TrimEnd('/');
         }
 
-        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model)
+        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null)
         {
             var requestBody = new
             {

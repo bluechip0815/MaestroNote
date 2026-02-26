@@ -40,7 +40,7 @@ namespace MaestroNotes.Data.Ai
             _listModels = listModels;
         }
 
-        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model)
+        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null)
         {
             try
             {
@@ -57,39 +57,79 @@ namespace MaestroNotes.Data.Ai
 
                 string endpointUrl;
                 string requestJson;
+                object requestBody;
 
                 if (endpointType == ModelEndpointType.Responses)
                 {
-                    // Prepare payload for POST /v1/responses
-                    var requestBody = new
+                    if (jsonSchema != null)
                     {
-                        model = model,
-                        tools = new[] 
+                        // Prepare payload for POST /v1/responses
+                        requestBody = new
                         {
-                            new { type = "web_search" }
-                        },
-                        instructions = systemPrompt,
-                        input = new[]
+                            model = model,
+                            tools = new[] { new { type = "web_search" } },
+                            text = new
+                            {
+                                format = new
+                                {
+                                    type = "json_schema",
+                                    name = "conzert",
+                                    schema = jsonSchema
+                                }
+                            },
+                            instructions = systemPrompt,
+                            input = new[] { new { role = "user", content = userPrompt } }
+                        };
+                    }
+                    else
+                    {
+                        // Prepare payload for POST /v1/responses
+                        requestBody = new
                         {
-                            new { role = "user", content = userPrompt }
-                        }
-                    };
+                            model = model,
+                            tools = new[] { new { type = "web_search" } },
+                            instructions = systemPrompt,
+                            input = new[] { new { role = "user", content = userPrompt } }
+                        };
+                    }
                     requestJson = JsonSerializer.Serialize(requestBody);
                     endpointUrl = $"{_baseUrl}/responses";
                 }
                 else
                 {
                     // Prepare payload for POST /v1/chat/completions (Legacy)
-                    var requestBody = new
+                    if (jsonSchema != null)
                     {
-                        model = model,
-                        messages = new[]
+                        requestBody = new
                         {
-                            new { role = "system", content = systemPrompt },
-                            new { role = "user", content = userPrompt }
-                        },
-                        temperature = 0.7
-                    };
+                            model = model,
+                            messages = new[]
+                            {
+                                new { role = "system", content = systemPrompt },
+                                new { role = "user", content = userPrompt }
+                            },
+                            temperature = 0.7,
+                            response_format = new
+                            {
+                                type = "json_schema",
+                                json_schema = jsonSchema
+                            }
+                        };
+                    }
+                    else
+                    {
+                        requestBody = new
+                        {
+                            model = model,
+                            messages = new[]
+                            {
+                                new { role = "system", content = systemPrompt },
+                                new { role = "user", content = userPrompt }
+                            },
+                            temperature = 0.7
+                        };
+                    }
+
                     requestJson = JsonSerializer.Serialize(requestBody);
                     endpointUrl = $"{_baseUrl}/chat/completions";
                 }
@@ -98,6 +138,11 @@ namespace MaestroNotes.Data.Ai
                 var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
                 request.Content = content;
+
+                //Console.WriteLine(JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
+                //{
+                //    WriteIndented = true
+                //}));
 
                 var response = await _httpClient.SendAsync(request);
 
@@ -111,7 +156,7 @@ namespace MaestroNotes.Data.Ai
                 var responseJson = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(responseJson);
 
-                string resultText = string.Empty;
+                string? resultText = null;
 
                 if (endpointType == ModelEndpointType.Responses)
                 {
@@ -136,7 +181,7 @@ namespace MaestroNotes.Data.Ai
 
                             foreach (var contentItem in contentElement.EnumerateArray())
                             {
-                                // optional aber empfohlen: nur Text-Blöcke nehmen
+                                // optional aber empfohlen: nur Text-BlÃ¶cke nehmen
                                 if (contentItem.TryGetProperty("type", out var contentType) &&
                                     contentType.ValueKind == JsonValueKind.String)
                                 {

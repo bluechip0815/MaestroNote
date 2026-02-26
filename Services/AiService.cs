@@ -1,11 +1,8 @@
-using System;
-using System.Threading.Tasks;
 using MaestroNotes.Data;
 using MaestroNotes.Data.Ai;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Logging;
 
 namespace MaestroNotes.Services
 {
@@ -85,24 +82,13 @@ namespace MaestroNotes.Services
             string userPrompt = string.Format(promptSettings.User, date.ToString("yyyy-MM-dd"), location);
             string systemPrompt = _settings.System;
 
-            // Expected JSON structure
-            var dummyDto = new AiKonzertResponseDto
-            {
-                Dirigent = "Name",
-                Orchester = "Name",
-                KomponistWerk = new[] { "Composer: Work" },
-                Solist = new[] { "Name" }
-            };
-            string jsonStructure = JsonSerializer.Serialize(dummyDto);
-
-            userPrompt += $"\n\nPlease return the response as a raw JSON object strictly matching this structure:\n{jsonStructure}";
-
             try
             {
                 // Use ModelReasoning if available, otherwise fallback to default Model
                 string modelToUse = !string.IsNullOrWhiteSpace(_settings.ModelReasoning) ? _settings.ModelReasoning : _settings.Model;
 
-                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, modelToUse);
+                var schema = JsonSchemaHelper.GenerateSchema(typeof(AiKonzertResponseDto));
+                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, modelToUse, schema);
                 jsonResponse = StripMarkdown(jsonResponse);
 
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
