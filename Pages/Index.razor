@@ -125,7 +125,7 @@
                 </div>
 
                 <button class="btn d-md-none ms-2" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="OpenConcertLocationModal">
-                    Konzert heute
+                    Konzert Anfrage
                 </button>
 
                 <span class="d-none d-md-inline">@GetNumber() Datensätze</span>
@@ -362,6 +362,20 @@
                     @loc
                 </button>
             }
+        </div>
+    </ChildContent>
+</ModalDialog>
+
+<ModalDialog Title="Konzert Anfrage: Datum wählen" Show="@ShowConcertDateModal" OnClose="@CloseConcertDateModal" ShowFooter="false">
+    <ChildContent>
+        <div class="mb-3">
+             <label class="form-label">Datum:</label>
+             <input type="date" class="form-control" @bind="ConcertPreviewDate" />
+        </div>
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary btn-lg py-3" @onclick="ConfirmConcertDate">
+                Weiter
+            </button>
         </div>
     </ChildContent>
 </ModalDialog>
@@ -994,6 +1008,9 @@
     private bool ShowConcertLocationModal = false;
     private List<string> ConcertLocations = new();
 
+    // New Modal State
+    private bool ShowConcertDateModal = false;
+
     private void OpenConcertLocationModal()
     {
         ConcertLocations = Service.GetLocationsByCount();
@@ -1006,11 +1023,26 @@
         return Task.CompletedTask;
     }
 
+    private Task CloseConcertDateModal(bool result)
+    {
+        ShowConcertDateModal = false;
+        return Task.CompletedTask;
+    }
+
     private async Task SelectConcertLocation(string location)
     {
         ConcertPreviewLocation = location;
-        ConcertPreviewDate = DateTime.Now;
+        ConcertPreviewDate = DateTime.Today; // Default to today
         ShowConcertLocationModal = false;
+
+        // Open Date Modal
+        ShowConcertDateModal = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmConcertDate()
+    {
+        ShowConcertDateModal = false;
 
         IsConcertPreviewLoading = true;
         ShowConcertPreviewModal = true;
