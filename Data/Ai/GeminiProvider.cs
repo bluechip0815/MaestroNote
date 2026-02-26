@@ -21,7 +21,7 @@ namespace MaestroNotes.Data.Ai
             _baseUrl = string.IsNullOrEmpty(baseUrl) ? "https://generativelanguage.googleapis.com/v1beta" : baseUrl.TrimEnd('/');
         }
 
-        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model)
+        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null)
         {
             // Gemini API structure
             // URL: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}
