@@ -108,7 +108,13 @@
                     </select>
                 }
 
-                <button class="btn btn-secondary" @onclick="RefreshList">Zeige</button>
+                <div class="d-flex w-100 gap-2">
+                    <button class="btn btn-secondary flex-grow-1" @onclick="RefreshList">Zeige</button>
+
+                    <button class="btn flex-grow-1 d-md-none" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="OpenConcertLocationModal">
+                        Konzert Anfrage
+                    </button>
+                </div>
 
                 <div class="dropdown d-none d-md-inline-block ms-2">
                     <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownSpecials" data-bs-toggle="dropdown" aria-expanded="false">
@@ -123,10 +129,6 @@
                         </AuthorizeView>
                     </ul>
                 </div>
-
-                <button class="btn d-md-none ms-2" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="OpenConcertLocationModal">
-                    Konzert Anfrage
-                </button>
 
                 <span class="d-none d-md-inline">@GetNumber() Datensätze</span>
 
@@ -243,11 +245,13 @@
                             }
 
                             <div class="mb-2">
-                                <strong>@record.WerkNames.Replace(", ", ": ")</strong> - <span class="text-muted">@record.KomponistNames.Replace(", ", ": ")</span>
+                                <strong><button type="button" class="btn btn-link p-0 text-decoration-none text-dark" style="vertical-align: baseline;" @onclick='() => FilterBy("Werk", record.WerkNames.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "")'>@record.WerkNames.Replace(", ", ": ")</button></strong> -
+                                <span class="text-muted"><button type="button" class="btn btn-link p-0 text-decoration-none text-muted" style="vertical-align: baseline;" @onclick='() => FilterBy("Komponist", record.KomponistNames.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "")'>@record.KomponistNames.Replace(", ", ": ")</button></span>
                             </div>
 
                             <div class="mb-2">
-                                <span>@record.DirigentName</span> - <span class="text-muted">@record.SolistNames.Replace(", ", ": ")</span>
+                                <span><button type="button" class="btn btn-link p-0 text-decoration-none text-dark" style="vertical-align: baseline;" @onclick='() => FilterBy("Dirigent", record.DirigentName)'>@record.DirigentName</button></span> -
+                                <span class="text-muted"><button type="button" class="btn btn-link p-0 text-decoration-none text-muted" style="vertical-align: baseline;" @onclick='() => FilterBy("Solist", record.SolistNames.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "")'>@record.SolistNames.Replace(", ", ": ")</button></span>
                             </div>
 
                             @if (!string.IsNullOrEmpty(record.Bewertung))
@@ -257,44 +261,6 @@
                                 </div>
                             }
 
-                            <!-- Actions -->
-                            <div class="d-flex justify-content-end">
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenuButton-mobile-@record.Id" data-bs-toggle="dropdown" aria-expanded="false">
-                                        Aktionen
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-mobile-@record.Id">
-                                        <li>
-                                            <a class="dropdown-item" role="button" @onclick="() => OpenNoteModal(record)">
-                                                <i class="fas fa-envelope me-2 text-warning"></i> Note
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" role="button" @onclick="() => OpenDetailsModal(record)">
-                                                <i class="fas fa-info-circle me-2 text-info"></i> Details
-                                            </a>
-                                        </li>
-                                        <AuthorizeView Roles="Admin, Operator" Context="adminItemContextMobile">
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
-                                                    <i class="fas fa-upload me-2 text-success"></i> Upload
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item" role="button" @onclick="() => Edit(record.Id)">
-                                                    <i class="fas fa-edit me-2 text-primary"></i> Bearbeiten
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item text-danger" role="button" @onclick="() => OpenDeleteModal(record)">
-                                                    <i class="fas fa-trash me-2"></i> Löschen
-                                                </a>
-                                            </li>
-                                        </AuthorizeView>
-                                    </ul>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 }
@@ -951,6 +917,14 @@
                 }
             }
         }
+    }
+
+    private void FilterBy(string category, string term)
+    {
+        searchCategory = category;
+        searchTerm = term;
+        selectedLimit = 5;
+        RefreshList();
     }
 
     private void RefreshList()
