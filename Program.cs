@@ -21,7 +21,7 @@ builder.Services.Configure<AiSettings>(builder.Configuration.GetSection("AiSetti
 
 string? connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 // string? serverVersion = builder.Configuration.GetConnectionString("ServerVersion"); // Unused
-builder.Services.AddDbContext<MusicContext>(option => option.UseInMemoryDatabase("TestDb"));
+builder.Services.AddDbContext<MusicContext>(option => option.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 38))));
 
 // Register Email Service
 builder.Services.AddScoped<IEmailService, EmailService>();
