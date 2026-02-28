@@ -925,7 +925,22 @@
     private void FilterBy(string category, string term)
     {
         searchCategory = category;
-        searchTerm = term;
+
+        // Find exact or partial match in the respective available list
+        string matchedTerm = term;
+        if (!string.IsNullOrEmpty(term))
+        {
+            if (category == "Werk")
+                matchedTerm = availableWerke.FirstOrDefault(x => x.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? term;
+            else if (category == "Komponist")
+                matchedTerm = availableKomponisten.FirstOrDefault(x => x.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? term;
+            else if (category == "Dirigent")
+                matchedTerm = availableDirigenten.FirstOrDefault(x => x.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? term;
+            else if (category == "Solist")
+                matchedTerm = availableSolisten.FirstOrDefault(x => x.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? term;
+        }
+
+        searchTerm = matchedTerm;
         selectedLimit = 5;
         RefreshList();
     }
