@@ -239,10 +239,13 @@
                 {
                     <div class="card mb-3 shadow-sm">
                         <div class="card-body">
-                            @if (!string.IsNullOrEmpty(record.Bezeichnung))
-                            {
-                                <h5 class="card-title text-primary">@record.Bezeichnung</h5>
-                            }
+                            <h5 class="card-title text-primary d-flex align-items-baseline gap-2">
+                                @if (!string.IsNullOrEmpty(record.Bezeichnung))
+                                {
+                                    <span>@record.Bezeichnung</span>
+                                }
+                                <small class="text-dark fs-6 fw-normal">@record.Datum.ToString("d.M.yyyy")</small>
+                            </h5>
 
                             <div class="mb-2">
                                 <strong><button type="button" class="btn btn-link p-0 text-decoration-none text-dark" style="vertical-align: baseline;" @onclick='() => FilterBy("Werk", record.WerkNames.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "")'>@record.WerkNames.Replace(", ", ": ")</button></strong> -
