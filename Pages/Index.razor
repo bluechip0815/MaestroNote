@@ -157,7 +157,7 @@
                 </AuthorizeView>
             </div>
 
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-hover align-middle modern-table">
                     <thead class="table-light">
                         <tr>
@@ -229,6 +229,75 @@
                         }
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Mobile View -->
+            <div class="d-md-none">
+                @foreach (var record in MusicRecords)
+                {
+                    <div class="card mb-3 shadow-sm">
+                        <div class="card-body">
+                            @if (!string.IsNullOrEmpty(record.Bezeichnung))
+                            {
+                                <h5 class="card-title text-primary">@record.Bezeichnung</h5>
+                            }
+
+                            <div class="mb-2">
+                                <strong>@record.WerkNames.Replace(", ", ": ")</strong> - <span class="text-muted">@record.KomponistNames.Replace(", ", ": ")</span>
+                            </div>
+
+                            <div class="mb-2">
+                                <span>@record.DirigentName</span> - <span class="text-muted">@record.SolistNames.Replace(", ", ": ")</span>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(record.Bewertung))
+                            {
+                                <div class="alert alert-light border">
+                                    @record.Bewertung
+                                </div>
+                            }
+
+                            <!-- Actions -->
+                            <div class="d-flex justify-content-end">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenuButton-mobile-@record.Id" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Aktionen
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-mobile-@record.Id">
+                                        <li>
+                                            <a class="dropdown-item" role="button" @onclick="() => OpenNoteModal(record)">
+                                                <i class="fas fa-envelope me-2 text-warning"></i> Note
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" role="button" @onclick="() => OpenDetailsModal(record)">
+                                                <i class="fas fa-info-circle me-2 text-info"></i> Details
+                                            </a>
+                                        </li>
+                                        <AuthorizeView Roles="Admin, Operator" Context="adminItemContextMobile">
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
+                                                    <i class="fas fa-upload me-2 text-success"></i> Upload
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" role="button" @onclick="() => Edit(record.Id)">
+                                                    <i class="fas fa-edit me-2 text-primary"></i> Bearbeiten
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" role="button" @onclick="() => OpenDeleteModal(record)">
+                                                    <i class="fas fa-trash me-2"></i> Löschen
+                                                </a>
+                                            </li>
+                                        </AuthorizeView>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
         }
     </Authorized>
