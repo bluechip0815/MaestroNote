@@ -501,27 +501,27 @@ namespace MaestroNotes.Services
             }
         }
 
-        public List<Komponist> GetAllKomponisten() => _context.Komponisten.ToList();
-        public List<Werk> GetAllWerke() => _context.Werke.Include(w => w.Komponist).ToList();
-        public List<Orchester> GetAllOrchester() => _context.Orchester.ToList();
-        public List<Dirigent> GetAllDirigenten() => _context.Dirigenten.ToList();
-        public List<Solist> GetAllSolisten() => _context.Solisten.ToList();
-        public List<Ort> GetAllOrte() => _context.Orte.ToList();
+        public List<Komponist> GetAllKomponisten() => _context.Komponisten.OrderBy(k => k.Name).ToList();
+        public List<Werk> GetAllWerke() => _context.Werke.Include(w => w.Komponist).OrderBy(w => w.Name).ToList();
+        public List<Orchester> GetAllOrchester() => _context.Orchester.OrderBy(o => o.Name).ToList();
+        public List<Dirigent> GetAllDirigenten() => _context.Dirigenten.OrderBy(d => d.Name).ToList();
+        public List<Solist> GetAllSolisten() => _context.Solisten.OrderBy(s => s.Name).ToList();
+        public List<Ort> GetAllOrte() => _context.Orte.OrderBy(o => o.Name).ToList();
 
-        public List<Komponist> GetIncompleteKomponisten() => _context.Komponisten.Where(k => k.Born == null && (k.Note == null || k.Note == "")).ToList();
-        public List<Dirigent> GetIncompleteDirigenten() => _context.Dirigenten.Where(d => d.Born == null && (d.Note == null || d.Note == "")).ToList();
-        public List<Solist> GetIncompleteSolisten() => _context.Solisten.Where(s => s.Born == null && (s.Note == null || s.Note == "")).ToList();
-        public List<Orchester> GetIncompleteOrchester() => _context.Orchester.Where(o => o.Founded == null && (o.Note == null || o.Note == "")).ToList();
-        public List<Werk> GetIncompleteWerke() => _context.Werke.Include(w => w.Komponist).Where(w => (w.Note == null || w.Note == "")).ToList();
-        public List<Ort> GetIncompleteOrte() => _context.Orte.Where(o => (o.Note == null || o.Note == "")).ToList();
+        public List<Komponist> GetIncompleteKomponisten() => _context.Komponisten.Where(k => k.Born == null && (k.Note == null || k.Note == "")).OrderBy(k => k.Name).ToList();
+        public List<Dirigent> GetIncompleteDirigenten() => _context.Dirigenten.Where(d => d.Born == null && (d.Note == null || d.Note == "")).OrderBy(d => d.Name).ToList();
+        public List<Solist> GetIncompleteSolisten() => _context.Solisten.Where(s => s.Born == null && (s.Note == null || s.Note == "")).OrderBy(s => s.Name).ToList();
+        public List<Orchester> GetIncompleteOrchester() => _context.Orchester.Where(o => o.Founded == null && (o.Note == null || o.Note == "")).OrderBy(o => o.Name).ToList();
+        public List<Werk> GetIncompleteWerke() => _context.Werke.Include(w => w.Komponist).Where(w => (w.Note == null || w.Note == "")).OrderBy(w => w.Name).ToList();
+        public List<Ort> GetIncompleteOrte() => _context.Orte.Where(o => (o.Note == null || o.Note == "")).OrderBy(o => o.Name).ToList();
 
         // NoTracking variants for Master Data Management to avoid context tracking conflicts
-        public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().ToList();
-        public List<Werk> GetAllWerkeNoTracking() => _context.Werke.Include(w => w.Komponist).AsNoTracking().ToList();
-        public List<Orchester> GetAllOrchesterNoTracking() => _context.Orchester.AsNoTracking().ToList();
-        public List<Dirigent> GetAllDirigentenNoTracking() => _context.Dirigenten.AsNoTracking().ToList();
-        public List<Solist> GetAllSolistenNoTracking() => _context.Solisten.AsNoTracking().ToList();
-        public List<Ort> GetAllOrteNoTracking() => _context.Orte.AsNoTracking().ToList();
+        public List<Komponist> GetAllKomponistenNoTracking() => _context.Komponisten.AsNoTracking().OrderBy(k => k.Name).ToList();
+        public List<Werk> GetAllWerkeNoTracking() => _context.Werke.Include(w => w.Komponist).AsNoTracking().OrderBy(w => w.Name).ToList();
+        public List<Orchester> GetAllOrchesterNoTracking() => _context.Orchester.AsNoTracking().OrderBy(o => o.Name).ToList();
+        public List<Dirigent> GetAllDirigentenNoTracking() => _context.Dirigenten.AsNoTracking().OrderBy(d => d.Name).ToList();
+        public List<Solist> GetAllSolistenNoTracking() => _context.Solisten.AsNoTracking().OrderBy(s => s.Name).ToList();
+        public List<Ort> GetAllOrteNoTracking() => _context.Orte.AsNoTracking().OrderBy(o => o.Name).ToList();
 
         public async Task AddKomponist(Komponist k)
         {
