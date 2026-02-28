@@ -1,10 +1,33 @@
 using System;
 using System.Text.RegularExpressions;
+using System.Text;
+using System.Globalization;
+using System.Collections.Generic;
 
 namespace MaestroNotes.Services
 {
     public static class FuzzyStringMatcher
     {
+        public static string RemoveDiacritics(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            var normalizedString = text.Normalize(NormalizationForm.FormD);
+            var stringBuilder = new StringBuilder();
+
+            foreach (var c in normalizedString)
+            {
+                var unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (unicodeCategory != UnicodeCategory.NonSpacingMark)
+                {
+                    stringBuilder.Append(c);
+                }
+            }
+
+            return stringBuilder.ToString().Normalize(NormalizationForm.FormC);
+        }
+
         public static string Normalize(string input)
         {
             if (string.IsNullOrEmpty(input)) return "";
@@ -15,6 +38,9 @@ namespace MaestroNotes.Services
             s = s.Replace("ä", "ae");
             s = s.Replace("ö", "oe");
             s = s.Replace("ü", "ue");
+
+            // Remove diacritics
+            s = RemoveDiacritics(s);
 
             // Handle prefixes
             s = s.Replace("van ", "v ");
@@ -83,6 +109,9 @@ namespace MaestroNotes.Services
             // Direct match check first for speed
             if (s1.Equals(s2, StringComparison.OrdinalIgnoreCase)) return true;
 
+            // Check if normalized last name matches
+            if (IsLastNameMatch(s1, s2)) return true;
+
             string n1 = Normalize(s1);
             string n2 = Normalize(s2);
 
@@ -95,6 +124,54 @@ namespace MaestroNotes.Services
             if (len <= 4) return dist == 0; // Strict for short words
             if (len <= 8) return dist <= 1; // Allow 1 typo for medium words
             return dist <= 2; // Allow 2 typos for longer words
+        }
+
+        public static bool IsLastNameMatch(string dbName, string inputName)
+        {
+             if (string.IsNullOrWhiteSpace(dbName) || string.IsNullOrWhiteSpace(inputName))
+                return false;
+
+             var dbVariations = GetLastNameVariations(dbName);
+             var inputVariations = GetLastNameVariations(inputName);
+
+             foreach (var dbVar in dbVariations)
+             {
+                 foreach (var inputVar in inputVariations)
+                 {
+                     if (string.Equals(dbVar, inputVar, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                 }
+             }
+
+             return false;
+        }
+
+        private static List<string> GetLastNameVariations(string fullName)
+        {
+            var variations = new List<string>();
+            if (string.IsNullOrWhiteSpace(fullName)) return variations;
+
+            // 1. Remove diacritics
+            string normalized = RemoveDiacritics(fullName);
+
+            // 2. Remove punctuation (replace with space to keep double-barrelled names separable if desired,
+            // or just strip? "Rimsky-Korsakov" -> "Rimsky Korsakov" allows checking "Korsakov")
+            normalized = Regex.Replace(normalized, @"[^\w\s]", " ");
+
+            // 3. Split by spaces
+            var parts = normalized.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return variations;
+
+            // 4. Extract last part
+            variations.Add(parts[^1]);
+
+            // 5. Extract last two parts (if applicable)
+            if (parts.Length >= 2)
+            {
+                variations.Add($"{parts[^2]} {parts[^1]}");
+            }
+
+            return variations;
         }
     }
 }
