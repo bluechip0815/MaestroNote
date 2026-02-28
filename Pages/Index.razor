@@ -865,10 +865,13 @@
         get => _searchCategory;
         set
         {
-            _searchCategory = value;
-            searchTerm = "";
-            searchDateFrom = null;
-            searchDateTo = null;
+            if (_searchCategory != value)
+            {
+                _searchCategory = value;
+                searchTerm = "";
+                searchDateFrom = null;
+                searchDateTo = null;
+            }
         }
     }
 
