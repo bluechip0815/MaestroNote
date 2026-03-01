@@ -39,16 +39,7 @@
                     }
                 </select>
 
-                @if (searchCategory == "Datum")
-                {
-                    <span class="date-search">
-                        <span>von</span>
-                        <input type="date" class="form-control" style="width: auto;" @bind="searchDateFrom" />
-                        <span>bis</span>
-                        <input type="date" class="form-control" style="width: auto;" @bind="searchDateTo" />
-                    </span>
-                }
-                else if (searchCategory == "Note")
+                @if (searchCategory == "Note")
                 {
                     <input type="text" class="form-control" style="width: 200px;" @bind="searchTerm" placeholder="(* und ? möglich)" />
                 }
@@ -860,7 +851,7 @@
     }
 
     // Search properties
-    private List<string> searchCategories = new() { "Werk", "Komponist", "Dirigent", "Ort", "Solist", "Orchester", "Note", "Datum", "Saisson" };
+    private List<string> searchCategories = new() { "Werk", "Komponist", "Dirigent", "Ort", "Solist", "Orchester", "Note", "Saisson" };
 
     private string _searchCategory = "Werk";
     private string searchCategory
@@ -872,15 +863,11 @@
             {
                 _searchCategory = value;
                 searchTerm = "";
-                searchDateFrom = null;
-                searchDateTo = null;
             }
         }
     }
 
     private string searchTerm = "";
-    private DateTime? searchDateFrom;
-    private DateTime? searchDateTo;
 
     // Dropdown lists
     private List<string> availableWerke = new();
@@ -950,7 +937,7 @@
 
     private void RefreshList()
     {
-        MusicRecords = Service.GetDisplayRecords(searchCategory, searchTerm, searchDateFrom, searchDateTo, selectedLimit);
+        MusicRecords = Service.GetDisplayRecords(searchCategory, searchTerm, selectedLimit);
     }
 
     private void Display(ChangeEventArgs a)

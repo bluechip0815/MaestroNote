@@ -163,7 +163,7 @@ namespace MaestroNotes.Services
             return _context.MusicRecords.ToList();
         }
 
-        public List<MusicRecordDisplayDto> GetDisplayRecords(string category, string searchTerm, DateTime? dateFrom, DateTime? dateTo, int limit)
+        public List<MusicRecordDisplayDto> GetDisplayRecords(string category, string searchTerm, int limit)
         {
             var query = _context.MusicRecords
                 .Include(m => m.Dirigent)
@@ -211,12 +211,6 @@ namespace MaestroNotes.Services
                             string pattern = searchTerm.Replace("*", "%").Replace("?", "_");
                             query = query.Where(m => EF.Functions.Like(m.Bewertung, pattern));
                         }
-                        break;
-                    case "Datum":
-                        if (dateFrom.HasValue)
-                            query = query.Where(m => m.Datum >= dateFrom.Value);
-                        if (dateTo.HasValue)
-                            query = query.Where(m => m.Datum <= dateTo.Value);
                         break;
                 }
             }
