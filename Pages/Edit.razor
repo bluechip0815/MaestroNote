@@ -95,19 +95,26 @@
             <!-- Ort -->
             <div class="form-group row mb-2">
                 <label class="col-sm-2 col-form-label">Ort:</label>
-                <div class="col-sm-8">
-                     <select id="Ort" class="form-control" @bind="currentRecord.OrtId">
-                        <option value="">(None)</option>
-                        @foreach (var o in OrteList)
-                        {
-                            <option value="@o.Id">@o.Name</option>
-                        }
-                    </select>
-                    <ValidationMessage For="@(() => currentRecord.OrtId)" />
-                </div>
-                <div class="col-sm-2">
-                     <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewOrt = true">
+                <div class="col-sm-10 d-flex gap-2">
+                     <div class="flex-grow-1">
+                         <select id="Ort" class="form-control" @bind="currentRecord.OrtId">
+                            <option value="">(None)</option>
+                            @foreach (var o in OrteList)
+                            {
+                                <option value="@o.Id">@o.Name</option>
+                            }
+                        </select>
+                        <ValidationMessage For="@(() => currentRecord.OrtId)" />
+                    </div>
+                    <button type="button" class="btn btn-outline-primary" @onclick="() => showNewOrt = true">
                         <i class="fas fa-plus"></i>
+                    </button>
+                    <button type="button" class="btn" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="StartAiSearch" disabled="@isAiSearching">
+                        @if(isAiSearching)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        <i class="fas fa-magic"></i> AI Suche
                     </button>
                 </div>
             </div>
@@ -207,20 +214,11 @@
     </div>
 
     <!-- ACTIONS -->
-    <div class="mt-4 d-flex align-items-center">
+    <div class="mt-4">
         <button type="button" class="btn btn-success" @onclick="() => Close(true)">
             <i class="fas fa-save"></i> Speichern
         </button>
-
-        <button type="button" class="btn ms-2" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="StartAiSearch" disabled="@isAiSearching">
-            @if(isAiSearching)
-            {
-                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-            }
-            <i class="fas fa-magic"></i> AI Suche
-        </button>
-
-        <button type="button" class="btn btn-secondary ms-auto" @onclick="() => Close(false)">
+        <button type="button" class="btn btn-secondary ms-2" @onclick="() => Close(false)">
             <i class="fas fa-times"></i> Abbrechen
         </button>
     </div>
