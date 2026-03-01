@@ -95,19 +95,26 @@
             <!-- Ort -->
             <div class="form-group row mb-2">
                 <label class="col-sm-2 col-form-label">Ort:</label>
-                <div class="col-sm-8">
-                     <select id="Ort" class="form-control" @bind="currentRecord.OrtId">
-                        <option value="">(None)</option>
-                        @foreach (var o in OrteList)
-                        {
-                            <option value="@o.Id">@o.Name</option>
-                        }
-                    </select>
-                    <ValidationMessage For="@(() => currentRecord.OrtId)" />
-                </div>
-                <div class="col-sm-2">
-                     <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => showNewOrt = true">
+                <div class="col-sm-10 d-flex gap-2">
+                     <div class="flex-grow-1">
+                         <select id="Ort" class="form-control" @bind="currentRecord.OrtId">
+                            <option value="">(None)</option>
+                            @foreach (var o in OrteList)
+                            {
+                                <option value="@o.Id">@o.Name</option>
+                            }
+                        </select>
+                        <ValidationMessage For="@(() => currentRecord.OrtId)" />
+                    </div>
+                    <button type="button" class="btn btn-outline-primary" @onclick="() => showNewOrt = true">
                         <i class="fas fa-plus"></i>
+                    </button>
+                    <button type="button" class="btn" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="StartAiSearch" disabled="@isAiSearching">
+                        @if(isAiSearching)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        <i class="fas fa-magic"></i> AI Suche
                     </button>
                 </div>
             </div>
@@ -474,6 +481,8 @@
     private int selectedWerkToAddId;
     private int selectedSolistToAddId;
 
+    private bool isAiSearching = false;
+
     private const string AiErrorMessage = "KI konnte leider keine Antwort finden";
 
     protected override void OnInitialized()
@@ -811,5 +820,149 @@
     private void RemoveSolist(Solist s)
     {
         currentRecord.Solisten.Remove(s);
+    }
+
+    // --- AI Suche (Edit Form) ---
+
+    private async Task StartAiSearch()
+    {
+        if (currentRecord.Datum == default)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Bitte wählen Sie zuerst ein Datum aus.");
+            return;
+        }
+
+        if (currentRecord.OrtId == null || currentRecord.OrtId == 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Bitte wählen Sie zuerst einen Ort aus.");
+            return;
+        }
+
+        var selectedOrt = OrteList.FirstOrDefault(o => o.Id == currentRecord.OrtId);
+        if (selectedOrt == null)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", "Ungültiger Ort ausgewählt.");
+             return;
+        }
+
+        isAiSearching = true;
+        StateHasChanged();
+
+        try
+        {
+            var data = await AiService.GetConcertPreview(selectedOrt.Name, currentRecord.Datum);
+
+            if (data == null)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+                return;
+            }
+
+            List<string> unmatchedItems = new List<string>();
+
+            // Fill Dirigent
+            if (!string.IsNullOrEmpty(data.Dirigent))
+            {
+                var dir = DirigentenList.FirstOrDefault(d => MaestroNotes.Services.FuzzyStringMatcher.IsMatch(d.Name, data.Dirigent));
+                if (dir != null)
+                {
+                    currentRecord.DirigentId = dir.Id;
+                }
+                else
+                {
+                    unmatchedItems.Add($"Dirigent: {data.Dirigent}");
+                }
+            }
+
+            // Fill Orchester
+            if (!string.IsNullOrEmpty(data.Orchester))
+            {
+                var orch = OrchesterList.FirstOrDefault(o => MaestroNotes.Services.FuzzyStringMatcher.IsMatch(o.Name, data.Orchester));
+                if (orch != null)
+                {
+                    currentRecord.OrchesterId = orch.Id;
+                }
+                else
+                {
+                    unmatchedItems.Add($"Orchester: {data.Orchester}");
+                }
+            }
+
+            // Fill Solisten
+            if (data.Solist != null)
+            {
+                foreach (var sName in data.Solist)
+                {
+                    if (string.IsNullOrWhiteSpace(sName)) continue;
+                    var solist = SolistenList.FirstOrDefault(s => MaestroNotes.Services.FuzzyStringMatcher.IsMatch(s.Name, sName));
+                    if (solist != null)
+                    {
+                        if (!currentRecord.Solisten.Any(s => s.Id == solist.Id))
+                        {
+                            currentRecord.Solisten.Add(solist);
+                        }
+                    }
+                    else
+                    {
+                        unmatchedItems.Add($"Solist: {sName}");
+                    }
+                }
+            }
+
+            // Fill Werke (Komponist: Werk)
+            if (data.KomponistWerk != null)
+            {
+                foreach (var kw in data.KomponistWerk)
+                {
+                    if (string.IsNullOrWhiteSpace(kw)) continue;
+
+                    string kName = "";
+                    string wName = kw;
+
+                    if (kw.Contains(":"))
+                    {
+                        var parts = kw.Split(new[] { ':' }, 2);
+                        kName = parts[0].Trim();
+                        wName = parts[1].Trim();
+                    }
+
+                    Komponist? komponist = null;
+                    if (!string.IsNullOrEmpty(kName))
+                    {
+                        komponist = KomponistenList.FirstOrDefault(k => MaestroNotes.Services.FuzzyStringMatcher.IsMatch(k.Name, kName));
+                    }
+
+                    var werk = WerkeList.FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.KomponistId == komponist.Id));
+                    if (werk != null)
+                    {
+                        if (!currentRecord.Werke.Any(w => w.Id == werk.Id))
+                        {
+                            currentRecord.Werke.Add(werk);
+                        }
+                    }
+                    else
+                    {
+                        unmatchedItems.Add($"Werk: {kw}");
+                    }
+                }
+            }
+
+            if (unmatchedItems.Count > 0)
+            {
+                string msg = "Folgende Daten der KI konnten nicht automatisch zugeordnet werden und müssen eventuell manuell angelegt werden:\\n\\n" +
+                             string.Join("\\n", unmatchedItems);
+                await JSRuntime.InvokeVoidAsync("alert", msg);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in StartAiSearch");
+            await JSRuntime.InvokeVoidAsync("alert", "Ein Fehler ist bei der KI-Suche aufgetreten.");
+        }
+        finally
+        {
+            isAiSearching = false;
+            StateHasChanged();
+        }
     }
 }
