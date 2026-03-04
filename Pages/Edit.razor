@@ -858,34 +858,34 @@
                 return;
             }
 
-            List<string> unmatchedItems = new List<string>();
+            bool addedNewItems = false;
 
             // Fill Dirigent
             if (!string.IsNullOrEmpty(data.Dirigent))
             {
                 var dir = DirigentenList.FirstOrDefault(d => MaestroNotes.Services.FuzzyStringMatcher.IsMatch(d.Name, data.Dirigent));
-                if (dir != null)
+                if (dir == null)
                 {
-                    currentRecord.DirigentId = dir.Id;
+                    dir = new Dirigent { Name = data.Dirigent };
+                    await Service.AddDirigent(dir);
+                    DirigentenList.Add(dir);
+                    addedNewItems = true;
                 }
-                else
-                {
-                    unmatchedItems.Add($"Dirigent: {data.Dirigent}");
-                }
+                currentRecord.DirigentId = dir.Id;
             }
 
             // Fill Orchester
             if (!string.IsNullOrEmpty(data.Orchester))
             {
                 var orch = OrchesterList.FirstOrDefault(o => MaestroNotes.Services.FuzzyStringMatcher.IsMatch(o.Name, data.Orchester));
-                if (orch != null)
+                if (orch == null)
                 {
-                    currentRecord.OrchesterId = orch.Id;
+                    orch = new Orchester { Name = data.Orchester };
+                    await Service.AddOrchester(orch);
+                    OrchesterList.Add(orch);
+                    addedNewItems = true;
                 }
-                else
-                {
-                    unmatchedItems.Add($"Orchester: {data.Orchester}");
-                }
+                currentRecord.OrchesterId = orch.Id;
             }
 
             // Fill Solisten
@@ -895,16 +895,16 @@
                 {
                     if (string.IsNullOrWhiteSpace(sName)) continue;
                     var solist = SolistenList.FirstOrDefault(s => MaestroNotes.Services.FuzzyStringMatcher.IsMatch(s.Name, sName));
-                    if (solist != null)
+                    if (solist == null)
                     {
-                        if (!currentRecord.Solisten.Any(s => s.Id == solist.Id))
-                        {
-                            currentRecord.Solisten.Add(solist);
-                        }
+                        solist = new Solist { Name = sName };
+                        await Service.AddSolist(solist);
+                        SolistenList.Add(solist);
+                        addedNewItems = true;
                     }
-                    else
+                    if (!currentRecord.Solisten.Any(s => s.Id == solist.Id))
                     {
-                        unmatchedItems.Add($"Solist: {sName}");
+                        currentRecord.Solisten.Add(solist);
                     }
                 }
             }
@@ -930,28 +930,34 @@
                     if (!string.IsNullOrEmpty(kName))
                     {
                         komponist = KomponistenList.FirstOrDefault(k => MaestroNotes.Services.FuzzyStringMatcher.IsMatch(k.Name, kName));
+                        if (komponist == null)
+                        {
+                            komponist = new Komponist { Name = kName };
+                            await Service.AddKomponist(komponist);
+                            KomponistenList.Add(komponist);
+                            addedNewItems = true;
+                        }
                     }
 
                     var werk = WerkeList.FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.KomponistId == komponist.Id));
-                    if (werk != null)
+                    if (werk == null)
                     {
-                        if (!currentRecord.Werke.Any(w => w.Id == werk.Id))
-                        {
-                            currentRecord.Werke.Add(werk);
-                        }
+                        werk = new Werk { Name = wName, KomponistId = komponist?.Id };
+                        await Service.AddWerk(werk);
+                        WerkeList.Add(werk);
+                        addedNewItems = true;
                     }
-                    else
+
+                    if (!currentRecord.Werke.Any(w => w.Id == werk.Id))
                     {
-                        unmatchedItems.Add($"Werk: {kw}");
+                        currentRecord.Werke.Add(werk);
                     }
                 }
             }
 
-            if (unmatchedItems.Count > 0)
+            if (addedNewItems)
             {
-                string msg = "Folgende Daten der KI konnten nicht automatisch zugeordnet werden und müssen eventuell manuell angelegt werden:\\n\\n" +
-                             string.Join("\\n", unmatchedItems);
-                await JSRuntime.InvokeVoidAsync("alert", msg);
+                LoadLists();
             }
         }
         catch (Exception ex)
