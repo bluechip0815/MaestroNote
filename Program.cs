@@ -3,6 +3,7 @@ using MaestroNotes.Data.Ai;
 using MaestroNotes.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -38,6 +39,33 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
         options.LoginPath = "/login";
         options.LogoutPath = "/auth/logout";
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnValidatePrincipal = async context =>
+            {
+                var principal = context.Principal;
+                if (principal != null)
+                {
+                    var tokenClaim = principal.FindFirst("CookieMagic");
+                    if (tokenClaim != null && Guid.TryParse(tokenClaim.Value, out Guid tokenGuid))
+                    {
+                        var dbContext = context.HttpContext.RequestServices.GetRequiredService<MusicContext>();
+                        var token = await dbContext.LoginTokens.FirstOrDefaultAsync(t => t.Token == tokenGuid);
+
+                        if (token == null || token.CreatedAt < DateTime.UtcNow.AddDays(-30))
+                        {
+                            context.RejectPrincipal();
+                            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        }
+                    }
+                    else
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    }
+                }
+            }
+        };
     });
 
 // Register AI Service and Provider

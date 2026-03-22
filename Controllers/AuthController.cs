@@ -31,7 +31,8 @@ namespace MaestroNotes.Controllers
             {
                 new Claim(ClaimTypes.Name, user.Name),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.UserLevel.ToString())
+                new Claim(ClaimTypes.Role, user.UserLevel.ToString()),
+                new Claim("CookieMagic", token) // Store the token in the cookie for later validation
             };
 
             var claimsIdentity = new ClaimsIdentity(
