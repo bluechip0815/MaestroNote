@@ -71,16 +71,13 @@ namespace MaestroNotes.Services
             try
             {
                 var token = await _context.LoginTokens
-                    .FirstOrDefaultAsync(t => t.Token == tokenGuid && !t.IsUsed);
+                    .FirstOrDefaultAsync(t => t.Token == tokenGuid);
 
                 if (token == null)
                     return null;
 
                 if (token.CreatedAt < DateTime.UtcNow.AddDays(-30))
                     return null; // Expired
-
-                token.IsUsed = true;
-                await _context.SaveChangesAsync();
 
                 var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == token.UserName);
                 return user;
