@@ -42,6 +42,13 @@ namespace MaestroNotes.Services
                     return false;
                 }
 
+                // Delete any existing tokens for this user so only the new one is valid
+                var existingTokens = await _context.LoginTokens.Where(t => t.UserName == user.Name).ToListAsync();
+                if (existingTokens.Any())
+                {
+                    _context.LoginTokens.RemoveRange(existingTokens);
+                }
+
                 var token = new LoginToken
                 {
                     UserName = user.Name,
