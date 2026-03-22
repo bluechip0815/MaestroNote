@@ -82,7 +82,7 @@ a:hover, .btn-link:hover {
 
 .modern-table tbody tr:hover {
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    transform: translateY(-2px);
+
 }
 
 .modern-table td {
