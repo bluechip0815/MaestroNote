@@ -65,3 +65,4 @@ __pycache__/
 # Logs
 *.log
 logs/
+.vs/
