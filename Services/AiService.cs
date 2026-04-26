@@ -160,14 +160,16 @@ namespace MaestroNotes.Services
                 // Solisten
                 if (data.Solist != null)
                 {
+                    var allSolisten = _musicService.GetAllSolisten().ToList();
                     foreach (var sName in data.Solist)
                     {
                         if (string.IsNullOrWhiteSpace(sName)) continue;
-                        var solist = _musicService.GetAllSolisten().FirstOrDefault(s => FuzzyStringMatcher.IsMatch(s.Name, sName));
+                        var solist = allSolisten.FirstOrDefault(s => FuzzyStringMatcher.IsMatch(s.Name, sName));
                         if (solist == null)
                         {
                             solist = new Solist { Name = sName };
                             await _musicService.AddSolist(solist);
+                            allSolisten.Add(solist);
                         }
                         record.Solisten.Add(solist);
                     }
@@ -176,6 +178,9 @@ namespace MaestroNotes.Services
                 // Werke (Komponist: Werk)
                 if (data.KomponistWerk != null)
                 {
+                    var allKomponisten = _musicService.GetAllKomponisten().ToList();
+                    var allWerke = _musicService.GetAllWerke().ToList();
+
                     foreach (var kw in data.KomponistWerk)
                     {
                         if (string.IsNullOrWhiteSpace(kw)) continue;
@@ -193,19 +198,21 @@ namespace MaestroNotes.Services
                         Komponist? komponist = null;
                         if (!string.IsNullOrEmpty(kName))
                         {
-                            komponist = _musicService.GetAllKomponisten().FirstOrDefault(k => FuzzyStringMatcher.IsMatch(k.Name, kName));
+                            komponist = allKomponisten.FirstOrDefault(k => FuzzyStringMatcher.IsMatch(k.Name, kName));
                             if (komponist == null)
                             {
                                 komponist = new Komponist { Name = kName };
                                 await _musicService.AddKomponist(komponist);
+                                allKomponisten.Add(komponist);
                             }
                         }
 
-                        var werk = _musicService.GetAllWerke().FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.Komponist == komponist));
+                        var werk = allWerke.FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.Komponist == komponist));
                         if (werk == null)
                         {
                             werk = new Werk { Name = wName, Komponist = komponist };
                             await _musicService.AddWerk(werk);
+                            allWerke.Add(werk);
                         }
 
                         record.Werke.Add(werk);
