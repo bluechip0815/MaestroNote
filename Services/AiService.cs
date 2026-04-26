@@ -109,6 +109,14 @@ namespace MaestroNotes.Services
 
              try
              {
+                // Pre-fetch all master data to avoid N+1 queries during matching
+                var allOrte = _musicService.GetAllOrte();
+                var allDirigenten = _musicService.GetAllDirigenten();
+                var allOrchester = _musicService.GetAllOrchester();
+                var allSolisten = _musicService.GetAllSolisten();
+                var allKomponisten = _musicService.GetAllKomponisten();
+                var allWerke = _musicService.GetAllWerke();
+
                 // Create MusicRecord
                 int startYear = date.Month >= 8 ? date.Year : date.Year - 1;
                 var record = new MusicRecord
@@ -121,11 +129,12 @@ namespace MaestroNotes.Services
                 // Ort
                 if (!string.IsNullOrEmpty(location))
                 {
-                    var ort = _musicService.GetAllOrte().FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, location));
+                    var ort = allOrte.FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, location));
                     if (ort == null)
                     {
                         ort = new Ort { Name = location };
                         await _musicService.AddOrt(ort);
+                        allOrte.Add(ort);
                     }
                     record.OrtEntity = ort;
                     record.OrtId = ort.Id;
@@ -134,11 +143,12 @@ namespace MaestroNotes.Services
                 // Dirigent
                 if (!string.IsNullOrEmpty(data.Dirigent))
                 {
-                    var dir = _musicService.GetAllDirigenten().FirstOrDefault(d => FuzzyStringMatcher.IsMatch(d.Name, data.Dirigent));
+                    var dir = allDirigenten.FirstOrDefault(d => FuzzyStringMatcher.IsMatch(d.Name, data.Dirigent));
                     if (dir == null)
                     {
                         dir = new Dirigent { Name = data.Dirigent };
                         await _musicService.AddDirigent(dir);
+                        allDirigenten.Add(dir);
                     }
                     record.Dirigent = dir;
                     record.DirigentId = dir.Id;
@@ -147,11 +157,12 @@ namespace MaestroNotes.Services
                 // Orchester
                 if (!string.IsNullOrEmpty(data.Orchester))
                 {
-                    var orch = _musicService.GetAllOrchester().FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, data.Orchester));
+                    var orch = allOrchester.FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, data.Orchester));
                     if (orch == null)
                     {
                         orch = new Orchester { Name = data.Orchester };
                         await _musicService.AddOrchester(orch);
+                        allOrchester.Add(orch);
                     }
                     record.Orchester = orch;
                     record.OrchesterId = orch.Id;
@@ -163,11 +174,12 @@ namespace MaestroNotes.Services
                     foreach (var sName in data.Solist)
                     {
                         if (string.IsNullOrWhiteSpace(sName)) continue;
-                        var solist = _musicService.GetAllSolisten().FirstOrDefault(s => FuzzyStringMatcher.IsMatch(s.Name, sName));
+                        var solist = allSolisten.FirstOrDefault(s => FuzzyStringMatcher.IsMatch(s.Name, sName));
                         if (solist == null)
                         {
                             solist = new Solist { Name = sName };
                             await _musicService.AddSolist(solist);
+                            allSolisten.Add(solist);
                         }
                         record.Solisten.Add(solist);
                     }
@@ -193,19 +205,21 @@ namespace MaestroNotes.Services
                         Komponist? komponist = null;
                         if (!string.IsNullOrEmpty(kName))
                         {
-                            komponist = _musicService.GetAllKomponisten().FirstOrDefault(k => FuzzyStringMatcher.IsMatch(k.Name, kName));
+                            komponist = allKomponisten.FirstOrDefault(k => FuzzyStringMatcher.IsMatch(k.Name, kName));
                             if (komponist == null)
                             {
                                 komponist = new Komponist { Name = kName };
                                 await _musicService.AddKomponist(komponist);
+                                allKomponisten.Add(komponist);
                             }
                         }
 
-                        var werk = _musicService.GetAllWerke().FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.Komponist == komponist));
+                        var werk = allWerke.FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.Komponist == komponist));
                         if (werk == null)
                         {
                             werk = new Werk { Name = wName, Komponist = komponist };
                             await _musicService.AddWerk(werk);
+                            allWerke.Add(werk);
                         }
 
                         record.Werke.Add(werk);
