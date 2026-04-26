@@ -489,6 +489,63 @@ namespace MaestroNotes.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task ReplaceKomponistAsync(int oldId, int newId)
+        {
+            var werke = await _context.Werke.Where(w => w.KomponistId == oldId).ToListAsync();
+            foreach(var w in werke)
+            {
+                w.KomponistId = newId;
+            }
+            var oldEntity = await _context.Komponisten.FindAsync(oldId);
+            if (oldEntity != null)
+            {
+                _context.Komponisten.Remove(oldEntity);
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task ReplaceDirigentAsync(int oldId, int newId)
+        {
+            var records = await _context.MusicRecords.Where(m => m.DirigentId == oldId).ToListAsync();
+            foreach(var m in records)
+            {
+                m.DirigentId = newId;
+            }
+            var oldEntity = await _context.Dirigenten.FindAsync(oldId);
+            if (oldEntity != null)
+            {
+                _context.Dirigenten.Remove(oldEntity);
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task ReplaceSolistAsync(int oldId, int newId)
+        {
+            var records = await _context.MusicRecords.Include(m => m.Solisten).Where(m => m.Solisten.Any(s => s.Id == oldId)).ToListAsync();
+            var newSolist = await _context.Solisten.FindAsync(newId);
+            if (newSolist != null)
+            {
+                foreach(var m in records)
+                {
+                    var oldSolist = m.Solisten.FirstOrDefault(s => s.Id == oldId);
+                    if (oldSolist != null)
+                    {
+                        m.Solisten.Remove(oldSolist);
+                        if (!m.Solisten.Any(s => s.Id == newId))
+                        {
+                            m.Solisten.Add(newSolist);
+                        }
+                    }
+                }
+            }
+            var oldEntityToRemove = await _context.Solisten.FindAsync(oldId);
+            if (oldEntityToRemove != null)
+            {
+                _context.Solisten.Remove(oldEntityToRemove);
+            }
+            await _context.SaveChangesAsync();
+        }
+
         public async Task DeleteAsync<T>(int id) where T : class
         {
             var entity = await _context.Set<T>().FindAsync(id);

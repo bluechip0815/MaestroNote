@@ -113,6 +113,7 @@
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dropdownSpecials">
                         <li><a class="dropdown-item" role="button" @onclick="OpenAiFillModal">KI Vervollständigen</a></li>
+                        <li><a class="dropdown-item" role="button" @onclick="OpenKorrekturModal">Korrektur</a></li>
                         <li><a class="dropdown-item" role="button" @onclick="OpenExportModal">Export</a></li>
                         <AuthorizeView Roles="Admin" Context="userAdminContext">
                             <li><hr class="dropdown-divider"></li>
@@ -1675,4 +1676,255 @@
             }
         }
     }
+
+    // --- Korrektur Modal ---
+    private bool ShowKorrekturModal = false;
+    private bool IsKorrekturLoading = false;
+    private List<KorrekturItemDto> KorrekturItems = new();
+    private bool ShowKorrekturEditModal = false;
+    private KorrekturItemDto? SelectedKorrekturItem;
+    private List<KorrekturItemDto>? KorrekturSimilarItems;
+
+    public class KorrekturItemDto
+    {
+        public int Id { get; set; }
+        public string TableName { get; set; } = "";
+        public string Vorname { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Note { get; set; } = "";
+        public object OriginalEntity { get; set; } = new();
+    }
+
+    private async Task OpenKorrekturModal()
+    {
+        ShowKorrekturModal = true;
+        IsKorrekturLoading = true;
+        KorrekturItems.Clear();
+        StateHasChanged();
+
+        await LoadKorrekturItems();
+
+        IsKorrekturLoading = false;
+        StateHasChanged();
+    }
+
+    private Task LoadKorrekturItems()
+    {
+        KorrekturItems.Clear();
+
+        var komps = Service.GetAllKomponistenNoTracking();
+        foreach(var k in komps)
+        {
+            if (IsKorrekturCandidate(k.Vorname, k.Name))
+            {
+                KorrekturItems.Add(new KorrekturItemDto { Id = k.Id, TableName = "Komponist", Vorname = k.Vorname ?? "", Name = k.Name ?? "", Note = k.Note ?? "", OriginalEntity = k });
+            }
+        }
+
+        var dirs = Service.GetAllDirigentenNoTracking();
+        foreach(var d in dirs)
+        {
+            if (IsKorrekturCandidate(d.Vorname, d.Name))
+            {
+                KorrekturItems.Add(new KorrekturItemDto { Id = d.Id, TableName = "Dirigent", Vorname = d.Vorname ?? "", Name = d.Name ?? "", Note = d.Note ?? "", OriginalEntity = d });
+            }
+        }
+
+        var sols = Service.GetAllSolistenNoTracking();
+        foreach(var s in sols)
+        {
+            if (IsKorrekturCandidate(s.Vorname, s.Name))
+            {
+                KorrekturItems.Add(new KorrekturItemDto { Id = s.Id, TableName = "Solist", Vorname = s.Vorname ?? "", Name = s.Name ?? "", Note = s.Note ?? "", OriginalEntity = s });
+            }
+        }
+        return Task.CompletedTask;
+    }
+
+    private bool IsKorrekturCandidate(string vorname, string name)
+    {
+        var vLen = string.IsNullOrWhiteSpace(vorname) ? 0 : vorname.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        var nLen = string.IsNullOrWhiteSpace(name) ? 0 : name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+
+        return (vLen == 0 && nLen > 1) || (nLen == 0 && vLen > 1);
+    }
+
+    private Task CloseKorrekturModal(bool result)
+    {
+        ShowKorrekturModal = false;
+        return Task.CompletedTask;
+    }
+
+    private void OpenKorrekturEditModal(KorrekturItemDto item)
+    {
+        SelectedKorrekturItem = new KorrekturItemDto
+        {
+            Id = item.Id,
+            TableName = item.TableName,
+            Vorname = item.Vorname,
+            Name = item.Name,
+            Note = item.Note,
+            OriginalEntity = item.OriginalEntity
+        };
+        KorrekturSimilarItems = null;
+        ShowKorrekturEditModal = true;
+    }
+
+    private Task CloseKorrekturEditModal(bool result)
+    {
+        ShowKorrekturEditModal = false;
+        SelectedKorrekturItem = null;
+        KorrekturSimilarItems = null;
+        return Task.CompletedTask;
+    }
+
+    private void SplitKorrekturItem()
+    {
+        if (SelectedKorrekturItem == null) return;
+
+        string sourceStr = string.IsNullOrWhiteSpace(SelectedKorrekturItem.Vorname) ? SelectedKorrekturItem.Name : SelectedKorrekturItem.Vorname;
+        var parts = sourceStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length > 0)
+        {
+            SelectedKorrekturItem.Vorname = parts[0];
+            if (parts.Length > 1)
+            {
+                SelectedKorrekturItem.Name = parts[1];
+            }
+            else
+            {
+                SelectedKorrekturItem.Name = "";
+            }
+
+            if (parts.Length > 2)
+            {
+                string rest = string.Join(" ", parts.Skip(2));
+                if (!string.IsNullOrEmpty(SelectedKorrekturItem.Note))
+                {
+                    SelectedKorrekturItem.Note = rest + " " + SelectedKorrekturItem.Note;
+                }
+                else
+                {
+                    SelectedKorrekturItem.Note = rest;
+                }
+            }
+        }
+    }
+
+    private async Task ApplyKorrekturEdit()
+    {
+        if (SelectedKorrekturItem == null) return;
+
+        KorrekturSimilarItems = new List<KorrekturItemDto>();
+        string searchName = $"{SelectedKorrekturItem.Vorname} {SelectedKorrekturItem.Name}".Trim();
+
+        if (SelectedKorrekturItem.TableName == "Komponist")
+        {
+            var komps = Service.GetAllKomponistenNoTracking();
+            foreach(var k in komps)
+            {
+                if (k.Id == SelectedKorrekturItem.Id) continue;
+                string dbName = $"{k.Vorname} {k.Name}".Trim();
+                if (MaestroNotes.Services.FuzzyStringMatcher.IsMatch(dbName, searchName))
+                {
+                    KorrekturSimilarItems.Add(new KorrekturItemDto { Id = k.Id, TableName = "Komponist", Vorname = k.Vorname ?? "", Name = k.Name ?? "", Note = k.Note ?? "" });
+                }
+            }
+        }
+        else if (SelectedKorrekturItem.TableName == "Dirigent")
+        {
+            var dirs = Service.GetAllDirigentenNoTracking();
+            foreach(var d in dirs)
+            {
+                if (d.Id == SelectedKorrekturItem.Id) continue;
+                string dbName = $"{d.Vorname} {d.Name}".Trim();
+                if (MaestroNotes.Services.FuzzyStringMatcher.IsMatch(dbName, searchName))
+                {
+                    KorrekturSimilarItems.Add(new KorrekturItemDto { Id = d.Id, TableName = "Dirigent", Vorname = d.Vorname ?? "", Name = d.Name ?? "", Note = d.Note ?? "" });
+                }
+            }
+        }
+        else if (SelectedKorrekturItem.TableName == "Solist")
+        {
+            var sols = Service.GetAllSolistenNoTracking();
+            foreach(var s in sols)
+            {
+                if (s.Id == SelectedKorrekturItem.Id) continue;
+                string dbName = $"{s.Vorname} {s.Name}".Trim();
+                if (MaestroNotes.Services.FuzzyStringMatcher.IsMatch(dbName, searchName))
+                {
+                    KorrekturSimilarItems.Add(new KorrekturItemDto { Id = s.Id, TableName = "Solist", Vorname = s.Vorname ?? "", Name = s.Name ?? "", Note = s.Note ?? "" });
+                }
+            }
+        }
+
+        if (KorrekturSimilarItems.Any())
+        {
+            StateHasChanged();
+        }
+        else
+        {
+            await SaveKorrekturAsNew();
+        }
+    }
+
+    private async Task SaveKorrekturAsNew()
+    {
+        if (SelectedKorrekturItem == null) return;
+
+        if (SelectedKorrekturItem.TableName == "Komponist")
+        {
+            var entity = (Komponist)SelectedKorrekturItem.OriginalEntity;
+            entity.Vorname = SelectedKorrekturItem.Vorname;
+            entity.Name = SelectedKorrekturItem.Name;
+            entity.Note = SelectedKorrekturItem.Note;
+            await Service.SaveAsync(entity);
+        }
+        else if (SelectedKorrekturItem.TableName == "Dirigent")
+        {
+            var entity = (Dirigent)SelectedKorrekturItem.OriginalEntity;
+            entity.Vorname = SelectedKorrekturItem.Vorname;
+            entity.Name = SelectedKorrekturItem.Name;
+            entity.Note = SelectedKorrekturItem.Note;
+            await Service.SaveAsync(entity);
+        }
+        else if (SelectedKorrekturItem.TableName == "Solist")
+        {
+            var entity = (Solist)SelectedKorrekturItem.OriginalEntity;
+            entity.Vorname = SelectedKorrekturItem.Vorname;
+            entity.Name = SelectedKorrekturItem.Name;
+            entity.Note = SelectedKorrekturItem.Note;
+            await Service.SaveAsync(entity);
+        }
+
+        await LoadKorrekturItems();
+        ShowKorrekturEditModal = false;
+        SelectedKorrekturItem = null;
+        KorrekturSimilarItems = null;
+    }
+
+    private async Task MergeKorrekturItem(int newId)
+    {
+        if (SelectedKorrekturItem == null) return;
+
+        if (SelectedKorrekturItem.TableName == "Komponist")
+        {
+            await Service.ReplaceKomponistAsync(SelectedKorrekturItem.Id, newId);
+        }
+        else if (SelectedKorrekturItem.TableName == "Dirigent")
+        {
+            await Service.ReplaceDirigentAsync(SelectedKorrekturItem.Id, newId);
+        }
+        else if (SelectedKorrekturItem.TableName == "Solist")
+        {
+            await Service.ReplaceSolistAsync(SelectedKorrekturItem.Id, newId);
+        }
+
+        await LoadKorrekturItems();
+        ShowKorrekturEditModal = false;
+        SelectedKorrekturItem = null;
+        KorrekturSimilarItems = null;
+    }
+
 }
