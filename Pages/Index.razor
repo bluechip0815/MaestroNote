@@ -1524,10 +1524,11 @@
                         updatedItems.Add(item);
                     }
                 }
+                AiProgressCurrent ++;
             }
             catch (Exception ex)
             {
-                err = ex.Message;
+                AiProgressMessage = ex.Message;
                 Logger.LogError(ex, $"Error processing {type} item");
                 AiProgressError++;
             }
@@ -1543,14 +1544,10 @@
 
         if (!updatedItems.IsEmpty)
         {
-                                                         AiProgressCurrent += updatedItems.Count();
+            
             await Service.SaveRangeAsync(updatedItems.ToList());
         }
-          if (AiProgressError > 4)
-          {
-              AiProgressMessage = err;
-              break;
-          }
+         
     }
 
     private bool ShowExportModal = false;
