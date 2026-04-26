@@ -490,6 +490,37 @@ namespace MaestroNotes.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task SaveRangeAsync<T>(IEnumerable<T> entities) where T : class
+        {
+            if (entities == null || !entities.Any())
+                return;
+
+            var idProp = typeof(T).GetProperty("Id");
+
+            foreach (var entity in entities)
+            {
+                if (idProp != null && idProp.PropertyType == typeof(int))
+                {
+                    int? id = idProp.GetValue(entity) as int?;
+                    if (id != null && id != 0)
+                    {
+                        var existing = _context.ChangeTracker.Entries<T>()
+                            .FirstOrDefault(e => idProp.GetValue(e.Entity) is int entityId && entityId == id);
+
+                        if (existing != null)
+                        {
+                            existing.CurrentValues.SetValues(entity);
+                            continue;
+                        }
+                    }
+                }
+
+                _context.Update(entity);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
         public async Task DeleteAsync<T>(int id) where T : class
         {
             var entity = await _context.Set<T>().FindAsync(id);

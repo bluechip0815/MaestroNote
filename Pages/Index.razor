@@ -6,6 +6,8 @@
 @using MaestroNotes.Shared
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.Extensions.Logging
+@using System.Collections.Concurrent
+@using System.Threading
 @using static MaestroNotes.Services.MusicService
 
 @inject MusicService Service
@@ -1443,12 +1445,15 @@
 
     private async Task ProcessList<T>(List<T> items, string type) where T : class
     {
-        string err = "";
-        foreach (var item in items)
-        {
-            AiProgressMessage = $"Verarbeite {type}...";
-            StateHasChanged(); // Ensure UI updates
+        AiProgressMessage = $"Verarbeite {type}...";
+        await InvokeAsync(StateHasChanged);
 
+        var updatedItems = new ConcurrentBag<T>();
+        using var semaphore = new SemaphoreSlim(5); // Throttle concurrent requests to 5
+
+        var tasks = items.Select(async item =>
+        {
+            await semaphore.WaitAsync();
             try
             {
                 string name = "";
@@ -1516,27 +1521,33 @@
 
                     if (updated)
                     {
-                        await Service.SaveAsync(item);
+                        updatedItems.Add(item);
                     }
                 }
+                AiProgressCurrent ++;
             }
             catch (Exception ex)
             {
-                err = ex.Message;
+                AiProgressMessage = ex.Message;
                 Logger.LogError(ex, $"Error processing {type} item");
                 AiProgressError++;
             }
-
-            AiProgressCurrent++;
-            StateHasChanged();
-            await Task.Delay(10);
-
-            if (AiProgressError > 4)
+            finally
             {
-                AiProgressMessage = err;
-                break;
+                semaphore.Release();
+                Interlocked.Increment(ref AiProgressCurrent);
+                await InvokeAsync(StateHasChanged);
             }
+        });
+
+        await Task.WhenAll(tasks);
+
+        if (!updatedItems.IsEmpty)
+        {
+            
+            await Service.SaveRangeAsync(updatedItems.ToList());
         }
+         
     }
 
     private bool ShowExportModal = false;
