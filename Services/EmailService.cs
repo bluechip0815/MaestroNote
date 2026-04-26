@@ -14,7 +14,7 @@ namespace MaestroNotes.Services
             _configuration = configuration;
         }
 
-        public async Task SendLoginLink(string email, string loginToken)
+        public async Task SendLoginLink(string email, string token)
         {
             try
             {
@@ -26,7 +26,7 @@ namespace MaestroNotes.Services
                 var linkBase = _configuration["Smtp:Link"] ?? "https://localhost:7121";
                 if (linkBase.EndsWith("/"))
                     linkBase = linkBase.Substring(0, linkBase.Length - 1);
-                var fullLink = $"{linkBase}/auth/verify?token={loginToken}";
+                var fullLink = $"{linkBase}/auth/verify?token={token}";
 
                 using var client = new SmtpClient(smtpHost, smtpPort)
                 {
@@ -38,7 +38,7 @@ namespace MaestroNotes.Services
                 if (smtpHost == "localhost" || string.IsNullOrEmpty(smtpUser))
                 {
                     // Fix: Ensure variable name matches parameter
-                    Log.Information($"[MOCK EMAIL] To: {email}, Link: {fullLink}");
+                    Log.Information("[MOCK EMAIL] To: {Email}, Token: {Token}, Link: {FullLink}", email, token, fullLink);
                     return;
                 }
 
@@ -52,7 +52,7 @@ namespace MaestroNotes.Services
                 mailMessage.To.Add(email);
 
                 await client.SendMailAsync(mailMessage);
-                Log.Information($"Email sent to {email}");
+                Log.Information("Email sent to {Email}", email);
             }
             catch (Exception ex)
             {
@@ -79,7 +79,7 @@ namespace MaestroNotes.Services
 
                 if (smtpHost == "localhost" || string.IsNullOrEmpty(smtpUser))
                 {
-                    Log.Information($"[MOCK EMAIL] To: {email}, Subject: {subject}, Body: {body}, Attachment: {attachmentPath}");
+                    Log.Information("[MOCK EMAIL] To: {Email}, Subject: {Subject}, Body: {Body}, Attachment: {AttachmentPath}", email, subject, body, attachmentPath);
                     return;
                 }
 
@@ -98,11 +98,11 @@ namespace MaestroNotes.Services
                 }
                 else
                 {
-                    Log.Warning($"Attachment not found: {attachmentPath}");
+                    Log.Warning("Attachment not found: {AttachmentPath}", attachmentPath);
                 }
 
                 await client.SendMailAsync(mailMessage);
-                Log.Information($"Email sent to {email} with attachment");
+                Log.Information("Email sent to {Email} with attachment", email);
             }
             catch (Exception ex)
             {

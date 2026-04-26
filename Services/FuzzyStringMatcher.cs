@@ -128,22 +128,22 @@ namespace MaestroNotes.Services
 
         public static bool IsLastNameMatch(string dbName, string inputName)
         {
-             if (string.IsNullOrWhiteSpace(dbName) || string.IsNullOrWhiteSpace(inputName))
+            if (string.IsNullOrWhiteSpace(dbName) || string.IsNullOrWhiteSpace(inputName))
                 return false;
 
-             var dbVariations = GetLastNameVariations(dbName);
-             var inputVariations = GetLastNameVariations(inputName);
+            var dbVariations = GetLastNameVariations(dbName);
+            var inputVariations = GetLastNameVariations(inputName);
 
-             foreach (var dbVar in dbVariations)
-             {
-                 foreach (var inputVar in inputVariations)
-                 {
-                     if (string.Equals(dbVar, inputVar, StringComparison.OrdinalIgnoreCase))
+            foreach (var dbVar in dbVariations)
+            {
+                foreach (var inputVar in inputVariations)
+                {
+                    if (string.Equals(dbVar, inputVar, StringComparison.OrdinalIgnoreCase))
                         return true;
-                 }
-             }
+                }
+            }
 
-             return false;
+            return false;
         }
 
         private static List<string> GetLastNameVariations(string fullName)

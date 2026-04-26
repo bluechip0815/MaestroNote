@@ -18,7 +18,7 @@ namespace MaestroNotes.Services
             {
                 Log.Logger.Information("MusicService constructed");
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 Log.Logger.Error(ex.Message);
             }
@@ -27,8 +27,8 @@ namespace MaestroNotes.Services
         // Authentication Methods
         public async Task<string?> GetUserEmail(string username)
         {
-             var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == username);
-             return user?.Email;
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == username);
+            return user?.Email;
         }
 
         public async Task<bool> RequestLoginLink(string name)
@@ -301,9 +301,9 @@ namespace MaestroNotes.Services
         {
             try
             {
-                return _context.Documents.Count(m => m.MusicRecordId == id)>0;
+                return _context.Documents.Count(m => m.MusicRecordId == id) > 0;
             }
-            catch  (Exception ex) 
+            catch (Exception ex)
             {
                 Log.Logger.Error(ex.Message);
             }
@@ -426,7 +426,8 @@ namespace MaestroNotes.Services
         }
         public async Task<string> DeleteDocument(int id)
         {
-            try {
+            try
+            {
                 var record = _context.Documents.Find(id);
                 if (record == null)
                     return $"Dataset #{id} not found";
@@ -439,7 +440,7 @@ namespace MaestroNotes.Services
 
                 return $"Dataset #{id} removed";
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 Log.Logger.Error(ex.Message);
                 return ex.Message;
@@ -471,16 +472,16 @@ namespace MaestroNotes.Services
             if (idProp != null && idProp.PropertyType == typeof(int))
             {
                 int? id = idProp.GetValue(entity) as int?;
-                if (id!=null && id != 0)
+                if (id != null && id != 0)
                 {
                     var existing = _context.ChangeTracker.Entries<T>()
                         .FirstOrDefault(e => idProp.GetValue(e.Entity) is int entityId && entityId == id);
 
                     if (existing != null)
                     {
-                         existing.CurrentValues.SetValues(entity);
-                         await _context.SaveChangesAsync();
-                         return;
+                        existing.CurrentValues.SetValues(entity);
+                        await _context.SaveChangesAsync();
+                        return;
                     }
                 }
             }
