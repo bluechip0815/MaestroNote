@@ -6,6 +6,8 @@
 @using MaestroNotes.Shared
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.Extensions.Logging
+@using System.Collections.Concurrent
+@using System.Threading
 @using static MaestroNotes.Services.MusicService
 
 @inject MusicService Service
@@ -1440,11 +1442,15 @@
 
     private async Task ProcessList<T>(List<T> items, string type) where T : class
     {
-        foreach (var item in items)
-        {
-            AiProgressMessage = $"Verarbeite {type}...";
-            StateHasChanged(); // Ensure UI updates
+        AiProgressMessage = $"Verarbeite {type}...";
+        await InvokeAsync(StateHasChanged);
 
+        var updatedItems = new ConcurrentBag<T>();
+        using var semaphore = new SemaphoreSlim(5); // Throttle concurrent requests to 5
+
+        var tasks = items.Select(async item =>
+        {
+            await semaphore.WaitAsync();
             try
             {
                 string name = "";
@@ -1512,18 +1518,27 @@
 
                     if (updated)
                     {
-                        await Service.SaveAsync(item);
+                        updatedItems.Add(item);
                     }
                 }
             }
             catch (Exception ex)
             {
-                 Logger.LogError(ex, $"Error processing {type} item");
+                Logger.LogError(ex, $"Error processing {type} item");
             }
+            finally
+            {
+                semaphore.Release();
+                Interlocked.Increment(ref AiProgressCurrent);
+                await InvokeAsync(StateHasChanged);
+            }
+        });
 
-            AiProgressCurrent++;
-            StateHasChanged();
-            await Task.Delay(10);
+        await Task.WhenAll(tasks);
+
+        if (!updatedItems.IsEmpty)
+        {
+            await Service.SaveRangeAsync(updatedItems.ToList());
         }
     }
 
