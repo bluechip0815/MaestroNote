@@ -93,7 +93,7 @@ namespace MaestroNotes.Data
                 .ThenBy(r => DateTime.TryParse(r.Datum, out var dt) ? dt : DateTime.MinValue)
                 .ToList();
 
-            List<string> list = ["",""];
+            List<string> list = ["", ""];
             double w = (9 * 1440) / 2.54;
             double h = w * 2 / 3;
             AppendImageToRtf(sb, "Komponisten.jpg", "Komponisten", list, w, h, false);
@@ -231,7 +231,7 @@ namespace MaestroNotes.Data
                     sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Werk)}, {EscapeRtf(r.Komponist)}\b0\par");
                 else
                     if (!string.IsNullOrEmpty(r.Werk))
-                        sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Komponist)}\b0\par");
+                    sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Komponist)}\b0\par");
                 else
                     sb.AppendLine($@"\pard\ql\li{LeftTab}\sl{LineSpacing}\slmult1\fi0\f0\fs16\b {EscapeRtf(r.Werk)}\b0\par");
 
@@ -387,7 +387,7 @@ namespace MaestroNotes.Data
             // 4) Dedication
             sb.AppendLine(@"\pard\s4 To my family, for their endless support.\par");
             sb.AppendLine(@"\page");
-           
+
         }
     }
 }
