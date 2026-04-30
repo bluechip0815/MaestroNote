@@ -171,6 +171,7 @@ namespace MaestroNotes.Services
                 // Solisten
                 if (data.Solist != null)
                 {
+                    var allSolisten = _musicService.GetAllSolisten().ToList();
                     foreach (var sName in data.Solist)
                     {
                         if (string.IsNullOrWhiteSpace(sName)) continue;
@@ -188,6 +189,9 @@ namespace MaestroNotes.Services
                 // Werke (Komponist: Werk)
                 if (data.KomponistWerk != null)
                 {
+                    var allKomponisten = _musicService.GetAllKomponisten().ToList();
+                    var allWerke = _musicService.GetAllWerke().ToList();
+
                     foreach (var kw in data.KomponistWerk)
                     {
                         if (string.IsNullOrWhiteSpace(kw)) continue;
