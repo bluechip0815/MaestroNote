@@ -105,10 +105,10 @@ namespace MaestroNotes.Services
 
         public async Task<MusicRecord?> SaveConcertData(AiKonzertResponseDto data, string location, DateTime date)
         {
-             if (data == null) return null;
+            if (data == null) return null;
 
-             try
-             {
+            try
+            {
                 // Create MusicRecord
                 int startYear = date.Month >= 8 ? date.Year : date.Year - 1;
                 var record = new MusicRecord
@@ -118,14 +118,23 @@ namespace MaestroNotes.Services
                     Bezeichnung = "Konzert"
                 };
 
+                // Pre-fetch master data to prevent N+1 queries during loop processing
+                var localOrte = _musicService.GetAllOrte().ToList();
+                var localDirigenten = _musicService.GetAllDirigenten().ToList();
+                var localOrchester = _musicService.GetAllOrchester().ToList();
+                var localSolisten = _musicService.GetAllSolisten().ToList();
+                var localKomponisten = _musicService.GetAllKomponisten().ToList();
+                var localWerke = _musicService.GetAllWerke().ToList();
+
                 // Ort
                 if (!string.IsNullOrEmpty(location))
                 {
-                    var ort = _musicService.GetAllOrte().FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, location));
+                    var ort = localOrte.FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, location));
                     if (ort == null)
                     {
                         ort = new Ort { Name = location };
                         await _musicService.AddOrt(ort);
+                        localOrte.Add(ort);
                     }
                     record.OrtEntity = ort;
                     record.OrtId = ort.Id;
@@ -134,11 +143,12 @@ namespace MaestroNotes.Services
                 // Dirigent
                 if (!string.IsNullOrEmpty(data.Dirigent))
                 {
-                    var dir = _musicService.GetAllDirigenten().FirstOrDefault(d => FuzzyStringMatcher.IsMatch(d.Name, data.Dirigent));
+                    var dir = localDirigenten.FirstOrDefault(d => FuzzyStringMatcher.IsMatch(d.Name, data.Dirigent));
                     if (dir == null)
                     {
                         dir = new Dirigent { Name = data.Dirigent };
                         await _musicService.AddDirigent(dir);
+                        localDirigenten.Add(dir);
                     }
                     record.Dirigent = dir;
                     record.DirigentId = dir.Id;
@@ -147,11 +157,12 @@ namespace MaestroNotes.Services
                 // Orchester
                 if (!string.IsNullOrEmpty(data.Orchester))
                 {
-                    var orch = _musicService.GetAllOrchester().FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, data.Orchester));
+                    var orch = localOrchester.FirstOrDefault(o => FuzzyStringMatcher.IsMatch(o.Name, data.Orchester));
                     if (orch == null)
                     {
                         orch = new Orchester { Name = data.Orchester };
                         await _musicService.AddOrchester(orch);
+                        localOrchester.Add(orch);
                     }
                     record.Orchester = orch;
                     record.OrchesterId = orch.Id;
@@ -164,12 +175,12 @@ namespace MaestroNotes.Services
                     foreach (var sName in data.Solist)
                     {
                         if (string.IsNullOrWhiteSpace(sName)) continue;
-                        var solist = allSolisten.FirstOrDefault(s => FuzzyStringMatcher.IsMatch(s.Name, sName));
+                        var solist = localSolisten.FirstOrDefault(s => FuzzyStringMatcher.IsMatch(s.Name, sName));
                         if (solist == null)
                         {
                             solist = new Solist { Name = sName };
                             await _musicService.AddSolist(solist);
-                            allSolisten.Add(solist);
+                            localSolisten.Add(solist);
                         }
                         record.Solisten.Add(solist);
                     }
@@ -198,21 +209,21 @@ namespace MaestroNotes.Services
                         Komponist? komponist = null;
                         if (!string.IsNullOrEmpty(kName))
                         {
-                            komponist = allKomponisten.FirstOrDefault(k => FuzzyStringMatcher.IsMatch(k.Name, kName));
+                            komponist = localKomponisten.FirstOrDefault(k => FuzzyStringMatcher.IsMatch(k.Name, kName));
                             if (komponist == null)
                             {
                                 komponist = new Komponist { Name = kName };
                                 await _musicService.AddKomponist(komponist);
-                                allKomponisten.Add(komponist);
+                                localKomponisten.Add(komponist);
                             }
                         }
 
-                        var werk = allWerke.FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.Komponist == komponist));
+                        var werk = localWerke.FirstOrDefault(w => w.Name.Equals(wName, StringComparison.OrdinalIgnoreCase) && (komponist == null || w.Komponist == komponist));
                         if (werk == null)
                         {
                             werk = new Werk { Name = wName, Komponist = komponist };
                             await _musicService.AddWerk(werk);
-                            allWerke.Add(werk);
+                            localWerke.Add(werk);
                         }
 
                         record.Werke.Add(werk);
@@ -221,12 +232,12 @@ namespace MaestroNotes.Services
 
                 await _musicService.SaveDataSet(record);
                 return record;
-             }
-             catch (Exception ex)
-             {
-                 _logger.LogError(ex, "Error saving concert data");
-                 throw;
-             }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving concert data");
+                throw;
+            }
         }
 
         public async Task<MusicRecord?> ExecuteConcertCheck(string location, DateTime date)
@@ -282,7 +293,7 @@ namespace MaestroNotes.Services
             }
             else
             {
-                 throw new ArgumentException($"Unsupported item type for JSON serialization: {itemType}", nameof(itemType));
+                throw new ArgumentException($"Unsupported item type for JSON serialization: {itemType}", nameof(itemType));
             }
 
             userPrompt += $"\n\nPlease return the response as a raw JSON object strictly matching this structure:\n{jsonStructure}";

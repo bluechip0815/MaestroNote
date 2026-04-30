@@ -13,7 +13,7 @@ namespace MaestroNotes.Data
 
         public DateTime Datum { get; set; } = DateTime.Now;
         [MaxLength(64)]
-        public string Spielsaison { get; set; } = $"{DateTime.Now.Year}/{(DateTime.Now.Year+1)%100}";
+        public string Spielsaison { get; set; } = $"{DateTime.Now.Year}/{(DateTime.Now.Year + 1) % 100}";
 
         [MaxLength(2000)]
         public string Bewertung { get; set; } = "";
