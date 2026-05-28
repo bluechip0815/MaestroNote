@@ -24,8 +24,8 @@
     </div>
 }
 
-<AuthorizeView>
-    <Authorized>
+<div>
+    <div>
         @if (EditMusicRecord is not null)
         {
             <h3>Bearbeiten</h3>
@@ -116,10 +116,10 @@
                     <ul class="dropdown-menu" aria-labelledby="dropdownSpecials">
                         <li><a class="dropdown-item" role="button" @onclick="OpenAiFillModal">KI Vervollständigen</a></li>
                         <li><a class="dropdown-item" role="button" @onclick="OpenExportModal">Export</a></li>
-                        <AuthorizeView Roles="Admin" Context="userAdminContext">
+                        <div>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" role="button" @onclick="OpenUserListModal">Benutzerverwaltung</a></li>
-                        </AuthorizeView>
+                        </div>
                     </ul>
                 </div>
 
@@ -132,7 +132,7 @@
                     }
                 </select>
 
-                <AuthorizeView Roles="Admin, Operator" Context="adminContext">
+                <div>
                     <div class="dropdown d-none d-md-inline-block me-2">
                         <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMaster" data-bs-toggle="dropdown" aria-expanded="false">
                             Stammdaten
@@ -149,7 +149,7 @@
                     <button class="btn btn-primary d-none d-md-inline-block" @onclick="() => AddNew()" title="Neuer Eintrag">
                         <i class="fas fa-plus"></i>
                     </button>
-                </AuthorizeView>
+                </div>
             </div>
 
             <div class="table-responsive d-none d-md-block">
@@ -199,7 +199,7 @@
                                                 </a>
                                             </li>
 
-                                            <AuthorizeView Roles="Admin, Operator" Context="adminItemContext">
+                                            <div>
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
@@ -216,7 +216,7 @@
                                                         <i class="fas fa-trash me-2"></i> Löschen
                                                     </a>
                                                 </li>
-                                            </AuthorizeView>
+                                            </div>
                                         </ul>
                                     </div>
                                 </td>
@@ -262,16 +262,16 @@
                 }
             </div>
         }
-    </Authorized>
-    <NotAuthorized>
+    </div>
+    <div style="display:none">
         <div class="text-center mt-5">
             <h3 class="mb-4">Meine Konzerte</h3>
             <p> <img src="Images/dresden.jpg" class="img-fluid rounded shadow" style="max-height: 500px;" /> </p>
             <p class="mt-4">Bitte melden Sie sich an, um auf die Konzertdatenbank zuzugreifen.</p>
             <a href="/login" class="btn btn-primary btn-lg mt-2">Zum Login</a>
         </div>
-    </NotAuthorized>
-</AuthorizeView>
+    </div>
+</div>
 
 @* --- Modals --- *@
 
@@ -320,11 +320,11 @@
                                 <label class="form-check-label small text-muted" for="chk-doc-@item.id">Vormerken für Export</label>
                             </div>
                         </div>
-                        <AuthorizeView Roles="Admin, Operator" Context="docAdmin">
+                        <div>
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                 <i class="fas fa-trash"></i>
                             </button>
-                        </AuthorizeView>
+                        </div>
                     </div>
                 }
 
@@ -341,11 +341,11 @@
                                     <label class="form-check-label small text-muted" for="chk-img-@item.id">Vormerken für Export</label>
                                 </div>
                              </div>
-                             <AuthorizeView Roles="Admin, Operator" Context="imgAdmin">
+                             <div>
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                     <i class="fas fa-trash"></i>
                                 </button>
-                             </AuthorizeView>
+                             </div>
                         </div>
                     </div>
                 }

@@ -69,6 +69,27 @@ namespace MaestroNotes.Services
             _musicService = musicService;
         }
 
+
+        public string DefaultModel => _settings.Model;
+        public string ReasoningModel => _settings.ModelReasoning;
+
+        public async Task<string> TestAiRequest(string prompt, string modelName)
+        {
+            _logger.LogInformation("TestAiRequest with Model {Model} and Prompt: {Prompt}", modelName, prompt);
+            try
+            {
+                // Note: The original code does not have provider factory, just a single _aiProvider.
+                // We'll use _aiProvider directly.
+                var response = await _aiProvider.SendRequestAsync("This is an provider test", prompt, modelName, null);
+                return response;
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error in TestAiRequest");
+                return $"Error: {ex.Message}";
+            }
+        }
+
         public async Task<AiKonzertResponseDto?> GetConcertPreview(string location, DateTime date)
         {
             _logger.LogInformation($"Checking concert preview for {location} on {date}");
