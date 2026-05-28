@@ -70,12 +70,29 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 // Register AI Service and Provider
 builder.Services.AddScoped<AiService>();
-builder.Services.AddHttpClient("AiClient"); // Register named client if needed, or just let Factory handle it.
+
+builder.Services.AddHttpClient("AiClient", client =>
+{
+    client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+})
+.ConfigurePrimaryHttpMessageHandler(sp =>
+{
+    var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AiSettings>>().Value;
+    var handler = new HttpClientHandler();
+    if (!string.IsNullOrEmpty(settings.Proxy))
+    {
+        handler.Proxy = new System.Net.WebProxy(settings.Proxy, settings.BypassLocal);
+        handler.UseProxy = true;
+        handler.UseDefaultCredentials = true;
+    }
+    return handler;
+});
 
 builder.Services.AddScoped<IAiProvider>(sp =>
 {
     var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AiSettings>>().Value;
-    var httpClient = HttpClientFactory.Create(settings);
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var httpClient = factory.CreateClient("AiClient");
     var logger = sp.GetRequiredService<ILogger<OpenAiProvider>>();
 
     return settings.Provider.ToLower() switch
