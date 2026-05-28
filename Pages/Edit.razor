@@ -532,7 +532,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillOrchesterAi");
-            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -563,7 +563,7 @@
         catch (Exception ex)
         {
              Logger.LogError(ex, "Error in FillDirigentAi");
-             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -593,7 +593,7 @@
         catch (Exception ex)
         {
              Logger.LogError(ex, "Error in FillSolistAi");
-             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -623,7 +623,7 @@
         catch (Exception ex)
         {
              Logger.LogError(ex, "Error in FillKomponistAi");
-             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -650,7 +650,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillOrtAi");
-            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -691,7 +691,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillWerkAi");
-            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -980,7 +980,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in StartAiSearch");
-            await JSRuntime.InvokeVoidAsync("alert", "Ein Fehler ist bei der KI-Suche aufgetreten.");
+            await JSRuntime.InvokeVoidAsync("alert", "Ein Fehler ist bei der KI-Suche aufgetreten.\nFehler: " + ex.Message);
         }
         finally
         {

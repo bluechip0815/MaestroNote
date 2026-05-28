@@ -815,6 +815,10 @@
         else
         {
             <p>Keine Daten gefunden.</p>
+            @if (!string.IsNullOrEmpty(ConcertPreviewErrorMessage))
+            {
+                <small class="text-danger">@ConcertPreviewErrorMessage</small>
+            }
             <div class="d-flex justify-content-end gap-2 mt-3">
                  <button class="btn btn-secondary" @onclick="() => CloseConcertPreviewModal(false)">Schließen</button>
             </div>
@@ -834,11 +838,13 @@
     private string ConcertPreviewLocation = "";
     private DateTime ConcertPreviewDate;
     private bool IsConcertPreviewLoading = false;
+    private string ConcertPreviewErrorMessage = "";
 
     private Task CloseConcertPreviewModal(bool result)
     {
         ShowConcertPreviewModal = false;
         ConcertPreviewData = null;
+        ConcertPreviewErrorMessage = "";
         return Task.CompletedTask;
     }
 
@@ -1102,6 +1108,7 @@
 
         IsConcertPreviewLoading = true;
         ShowConcertPreviewModal = true;
+        ConcertPreviewErrorMessage = "";
         StateHasChanged();
 
         try
@@ -1114,8 +1121,7 @@
 
             if (ConcertPreviewData == null)
             {
-                ShowConcertPreviewModal = false;
-                await ShowInfo(AiErrorMessage);
+                ConcertPreviewErrorMessage = AiErrorMessage;
             }
         }
         catch (TaskCanceledException)
@@ -1123,10 +1129,11 @@
             ShowConcertPreviewModal = false;
             await ShowInfo("Die AI Anfrage wurde abgebrochen oder ein Timeout (10 Min) wurde erreicht.");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            ShowConcertPreviewModal = false;
-            await ShowInfo("Ein Fehler ist aufgetreten.");
+            ConcertPreviewErrorMessage = "Ein Fehler ist aufgetreten.\nFehler: " + ex.Message;
+            // Let the modal stay open to show the error message.
+            ConcertPreviewData = null;
         }
         finally
         {
@@ -1365,7 +1372,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillMasterAi");
-            await JS.InvokeVoidAsync("alert", AiErrorMessage);
+            await JS.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
