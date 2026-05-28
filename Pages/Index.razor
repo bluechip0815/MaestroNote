@@ -13,6 +13,7 @@
 @inject MusicService Service
 @inject AiService AiService
 @inject IJSRuntime JS
+@implements IDisposable
 @inject ILogger<Index> Logger
 
 <PageTitle>Meine Konzerte</PageTitle>
@@ -1058,7 +1059,8 @@
         DeleteRecordId = 0;
     }
 
-    // --- Concert Check Modal ---
+    // --- Konzert Anfrage (Heute/Preview) ---
+    private CancellationTokenSource? aiCts;
     private bool ShowConcertLocationModal = false;
     private List<string> ConcertLocations = new();
 
@@ -1102,15 +1104,41 @@
         ShowConcertPreviewModal = true;
         StateHasChanged();
 
-        ConcertPreviewData = await AiService.GetConcertPreview(ConcertPreviewLocation, ConcertPreviewDate);
-        IsConcertPreviewLoading = false;
+        try
+        {
+            aiCts?.Cancel();
+            aiCts?.Dispose();
+            aiCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
 
-        if (ConcertPreviewData == null)
+            ConcertPreviewData = await AiService.GetConcertPreview(ConcertPreviewLocation, ConcertPreviewDate, aiCts.Token);
+
+            if (ConcertPreviewData == null)
+            {
+                ShowConcertPreviewModal = false;
+                await ShowInfo(AiErrorMessage);
+            }
+        }
+        catch (TaskCanceledException)
         {
             ShowConcertPreviewModal = false;
-            await ShowInfo(AiErrorMessage);
+            await ShowInfo("Die AI Anfrage wurde abgebrochen oder ein Timeout (10 Min) wurde erreicht.");
         }
-        StateHasChanged();
+        catch (Exception)
+        {
+            ShowConcertPreviewModal = false;
+            await ShowInfo("Ein Fehler ist aufgetreten.");
+        }
+        finally
+        {
+            IsConcertPreviewLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        aiCts?.Cancel();
+        aiCts?.Dispose();
     }
 
     // --- Edit (Full) ---

@@ -69,7 +69,7 @@ namespace MaestroNotes.Services
             _musicService = musicService;
         }
 
-        public async Task<AiKonzertResponseDto?> GetConcertPreview(string location, DateTime date)
+        public async Task<AiKonzertResponseDto?> GetConcertPreview(string location, DateTime date, CancellationToken cancellationToken = default)
         {
             _logger.LogInformation($"Checking concert preview for {location} on {date}");
 
@@ -88,7 +88,7 @@ namespace MaestroNotes.Services
                 string modelToUse = !string.IsNullOrWhiteSpace(_settings.ModelReasoning) ? _settings.ModelReasoning : _settings.Model;
 
                 var schema = JsonSchemaHelper.GenerateSchema(typeof(AiKonzertResponseDto));
-                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, modelToUse, schema);
+                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, modelToUse, schema, cancellationToken);
                 jsonResponse = StripMarkdown(jsonResponse);
 
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -240,14 +240,14 @@ namespace MaestroNotes.Services
             }
         }
 
-        public async Task<MusicRecord?> ExecuteConcertCheck(string location, DateTime date)
+        public async Task<MusicRecord?> ExecuteConcertCheck(string location, DateTime date, CancellationToken cancellationToken = default)
         {
-            var data = await GetConcertPreview(location, date);
+            var data = await GetConcertPreview(location, date, cancellationToken);
             if (data == null) return null;
             return await SaveConcertData(data, location, date);
         }
 
-        public async Task<object> RequestAiData(string name, string itemType)
+        public async Task<object> RequestAiData(string name, string itemType, CancellationToken cancellationToken = default)
         {
             if (!_settings.Prompts.TryGetValue(itemType, out var promptSettings))
             {
@@ -301,7 +301,7 @@ namespace MaestroNotes.Services
             try
             {
                 _logger.LogInformation("Sending AI Request for {ItemType}: {Name}", itemType, name);
-                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, _settings.Model);
+                string jsonResponse = await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, _settings.Model, null, cancellationToken);
 
                 // Clean up potential markdown code blocks (```json ... ```)
                 jsonResponse = StripMarkdown(jsonResponse);
