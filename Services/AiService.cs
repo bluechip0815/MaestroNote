@@ -99,7 +99,7 @@ namespace MaestroNotes.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error executing concert check preview");
-                return null;
+                throw;
             }
         }
 
