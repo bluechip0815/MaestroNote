@@ -119,9 +119,9 @@
                     <ul class="dropdown-menu" aria-labelledby="dropdownSpecials">
                         <li><a class="dropdown-item" role="button" @onclick="OpenAiFillModal">KI Vervollständigen</a></li>
                         <li><a class="dropdown-item" role="button" @onclick="OpenExportModal">Export</a></li>
-                        <li><a class="dropdown-item" role="button" @onclick="OpenAiTestModal">KI-Test</a></li>
                         <AuthorizeView Roles="Admin" Context="userAdminContext">
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" role="button" @onclick="OpenAiTestModal">KI-Test</a></li>
                             <li><a class="dropdown-item" role="button" @onclick="OpenUserListModal">Benutzerverwaltung</a></li>
                         </AuthorizeView>
                     </ul>
