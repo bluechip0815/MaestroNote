@@ -15,6 +15,7 @@
 @using Microsoft.Extensions.Options
 @inject AiService AiService
 @inject IJSRuntime JS
+@implements IDisposable
 @inject ILogger<Index> Logger
 @inject IOptions<AiSettings> AiSettings
 
@@ -46,11 +47,11 @@
 
                 @if (searchCategory == "Note")
                 {
-                    <input type="text" class="form-control" style="width: 200px;" @bind="searchTerm" placeholder="(* und ? möglich)" />
+                    <input type="text" class="form-control flex-grow-1" style="max-width: 40%;" @bind="searchTerm" placeholder="(* und ? möglich)" />
                 }
                 else
                 {
-                    <select class="form-select" style="width: auto;" @bind="searchTerm">
+                    <select class="form-select flex-grow-1" style="max-width: 40%;" @bind="searchTerm">
                         <option value="">Bitte wählen...</option>
                         @if (searchCategory == "Werk")
                         {
@@ -104,7 +105,7 @@
                     </select>
                 }
 
-                <div class="d-flex w-100 gap-2">
+                <div class="d-flex w-100-mobile gap-2">
                     <button class="btn btn-secondary flex-grow-1" @onclick="RefreshList">Zeige</button>
 
                     <button class="btn flex-grow-1 d-md-none" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="OpenConcertLocationModal">
@@ -818,6 +819,10 @@
         else
         {
             <p>Keine Daten gefunden.</p>
+            @if (!string.IsNullOrEmpty(ConcertPreviewErrorMessage))
+            {
+                <small class="text-danger">@ConcertPreviewErrorMessage</small>
+            }
             <div class="d-flex justify-content-end gap-2 mt-3">
                  <button class="btn btn-secondary" @onclick="() => CloseConcertPreviewModal(false)">Schließen</button>
             </div>
@@ -924,11 +929,13 @@
     private string ConcertPreviewLocation = "";
     private DateTime ConcertPreviewDate;
     private bool IsConcertPreviewLoading = false;
+    private string ConcertPreviewErrorMessage = "";
 
     private Task CloseConcertPreviewModal(bool result)
     {
         ShowConcertPreviewModal = false;
         ConcertPreviewData = null;
+        ConcertPreviewErrorMessage = "";
         return Task.CompletedTask;
     }
 
@@ -1149,7 +1156,8 @@
         DeleteRecordId = 0;
     }
 
-    // --- Concert Check Modal ---
+    // --- Konzert Anfrage (Heute/Preview) ---
+    private CancellationTokenSource? aiCts;
     private bool ShowConcertLocationModal = false;
     private List<string> ConcertLocations = new();
 
@@ -1191,17 +1199,44 @@
 
         IsConcertPreviewLoading = true;
         ShowConcertPreviewModal = true;
+        ConcertPreviewErrorMessage = "";
         StateHasChanged();
 
-        ConcertPreviewData = await AiService.GetConcertPreview(ConcertPreviewLocation, ConcertPreviewDate);
-        IsConcertPreviewLoading = false;
+        try
+        {
+            aiCts?.Cancel();
+            aiCts?.Dispose();
+            aiCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
 
-        if (ConcertPreviewData == null)
+            ConcertPreviewData = await AiService.GetConcertPreview(ConcertPreviewLocation, ConcertPreviewDate, aiCts.Token);
+
+            if (ConcertPreviewData == null)
+            {
+                ConcertPreviewErrorMessage = AiErrorMessage;
+            }
+        }
+        catch (TaskCanceledException)
         {
             ShowConcertPreviewModal = false;
-            await ShowInfo(AiErrorMessage);
+            await ShowInfo("Die AI Anfrage wurde abgebrochen oder ein Timeout (10 Min) wurde erreicht.");
         }
-        StateHasChanged();
+        catch (Exception ex)
+        {
+            ConcertPreviewErrorMessage = "Ein Fehler ist aufgetreten.\nFehler: " + ex.Message;
+            // Let the modal stay open to show the error message.
+            ConcertPreviewData = null;
+        }
+        finally
+        {
+            IsConcertPreviewLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        aiCts?.Cancel();
+        aiCts?.Dispose();
     }
 
     // --- Edit (Full) ---
@@ -1428,7 +1463,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillMasterAi");
-            await JS.InvokeVoidAsync("alert", AiErrorMessage);
+            await JS.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 

@@ -4,6 +4,7 @@
 @inject MusicService Service
 @inject AiService AiService
 @inject IJSRuntime JSRuntime
+@implements IDisposable
 @inject ILogger<Edit> Logger
 
 <EditForm Model="@currentRecord">
@@ -531,7 +532,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillOrchesterAi");
-            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -562,7 +563,7 @@
         catch (Exception ex)
         {
              Logger.LogError(ex, "Error in FillDirigentAi");
-             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -592,7 +593,7 @@
         catch (Exception ex)
         {
              Logger.LogError(ex, "Error in FillSolistAi");
-             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -622,7 +623,7 @@
         catch (Exception ex)
         {
              Logger.LogError(ex, "Error in FillKomponistAi");
-             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+             await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -649,7 +650,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillOrtAi");
-            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -690,7 +691,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillWerkAi");
-            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage);
+            await JSRuntime.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
         }
     }
 
@@ -824,6 +825,14 @@
 
     // --- AI Suche (Edit Form) ---
 
+    private CancellationTokenSource? aiCts;
+
+    public void Dispose()
+    {
+        aiCts?.Cancel();
+        aiCts?.Dispose();
+    }
+
     private async Task StartAiSearch()
     {
         if (currentRecord.Datum == default)
@@ -850,7 +859,11 @@
 
         try
         {
-            var data = await AiService.GetConcertPreview(selectedOrt.Name, currentRecord.Datum);
+            aiCts?.Cancel();
+            aiCts?.Dispose();
+            aiCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+
+            var data = await AiService.GetConcertPreview(selectedOrt.Name, currentRecord.Datum, aiCts.Token);
 
             if (data == null)
             {
@@ -960,10 +973,14 @@
                 LoadLists();
             }
         }
+        catch (TaskCanceledException)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Die AI Anfrage wurde abgebrochen oder ein Timeout (10 Min) wurde erreicht.");
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in StartAiSearch");
-            await JSRuntime.InvokeVoidAsync("alert", "Ein Fehler ist bei der KI-Suche aufgetreten.");
+            await JSRuntime.InvokeVoidAsync("alert", "Ein Fehler ist bei der KI-Suche aufgetreten.\nFehler: " + ex.Message);
         }
         finally
         {
