@@ -21,7 +21,7 @@ namespace MaestroNotes.Data.Ai
             _baseUrl = string.IsNullOrEmpty(baseUrl) ? "https://generativelanguage.googleapis.com/v1beta" : baseUrl.TrimEnd('/');
         }
 
-        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null, System.Threading.CancellationToken cancellationToken = default)
+        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null)
         {
             // Gemini API structure
             // URL: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}
@@ -44,11 +44,11 @@ namespace MaestroNotes.Data.Ai
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             var url = $"{_baseUrl}/models/{model}:generateContent?key={_apiKey}";
-            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+            var response = await _httpClient.PostAsync(url, content);
 
             response.EnsureSuccessStatusCode();
 
-            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            var responseJson = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseJson);
 
             // Navigate to candidates[0].content.parts[0].text

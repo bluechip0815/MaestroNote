@@ -5,9 +5,7 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Net.Http.Headers;
 using System.Collections.Generic;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using System.Threading;
 
 namespace MaestroNotes.Data.Ai
 {
@@ -42,9 +40,8 @@ namespace MaestroNotes.Data.Ai
             _listModels = listModels;
         }
 
-        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null, CancellationToken cancellationToken = default)
+        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null)
         {
-            var sw = Stopwatch.StartNew();
             try
             {
                 // Verify model availability if configured
@@ -147,19 +144,16 @@ namespace MaestroNotes.Data.Ai
                 //    WriteIndented = true
                 //}));
 
-                var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                var response = await _httpClient.SendAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var errorContent = await response.Content.ReadAsStringAsync();
                     _logger.LogError("OpenAI API request failed with status code {StatusCode}: {ErrorContent}", response.StatusCode, errorContent);
                     response.EnsureSuccessStatusCode(); // Will throw HttpRequestException
                 }
 
-                var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-                sw.Stop();
-                _logger.LogInformation("OpenAI API request completed successfully in {ElapsedMilliseconds}ms for model '{Model}' via '{EndpointType}'", sw.ElapsedMilliseconds, model, endpointType);
-
+                var responseJson = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(responseJson);
 
                 string? resultText = null;
@@ -228,16 +222,9 @@ namespace MaestroNotes.Data.Ai
 
                 return resultText ?? string.Empty;
             }
-            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
-            {
-                sw.Stop();
-                _logger.LogWarning(ex, "OpenAI API request was canceled via CancellationToken after {ElapsedMilliseconds}ms for model '{Model}'.", sw.ElapsedMilliseconds, model);
-                throw;
-            }
             catch (Exception ex)
             {
-                sw.Stop();
-                _logger.LogError(ex, "Error sending request to OpenAI API after {ElapsedMilliseconds}ms for model '{Model}'.", sw.ElapsedMilliseconds, model);
+                _logger.LogError(ex, "Error sending request to OpenAI API.");
                 throw; // Re-throw to let the caller handle or display generic error
             }
         }
