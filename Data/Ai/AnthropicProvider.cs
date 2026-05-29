@@ -19,7 +19,7 @@ namespace MaestroNotes.Data.Ai
             _baseUrl = string.IsNullOrEmpty(baseUrl) ? "https://api.anthropic.com/v1" : baseUrl.TrimEnd('/');
         }
 
-        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null, System.Threading.CancellationToken cancellationToken = default)
+        public async Task<string> SendRequestAsync(string systemPrompt, string userPrompt, string model, object? jsonSchema = null)
         {
             var requestBody = new
             {
@@ -40,10 +40,10 @@ namespace MaestroNotes.Data.Ai
             request.Headers.Add("anthropic-version", "2023-06-01"); // Default version
             request.Content = content;
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
-            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            var responseJson = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseJson);
 
             // Response structure: content[0].text

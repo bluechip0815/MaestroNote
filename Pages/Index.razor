@@ -3,6 +3,7 @@
 @using System.Text.Json
 @using System.Text.Json.Serialization
 @using MaestroNotes.Data
+@using MaestroNotes.Data.Ai
 @using MaestroNotes.Shared
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.Extensions.Logging
@@ -11,10 +12,11 @@
 @using static MaestroNotes.Services.MusicService
 
 @inject MusicService Service
+@using Microsoft.Extensions.Options
 @inject AiService AiService
 @inject IJSRuntime JS
-@implements IDisposable
 @inject ILogger<Index> Logger
+@inject IOptions<AiSettings> AiSettings
 
 <PageTitle>Meine Konzerte</PageTitle>
 
@@ -44,11 +46,11 @@
 
                 @if (searchCategory == "Note")
                 {
-                    <input type="text" class="form-control flex-grow-1" style="max-width: 40%;" @bind="searchTerm" placeholder="(* und ? möglich)" />
+                    <input type="text" class="form-control" style="width: 200px;" @bind="searchTerm" placeholder="(* und ? möglich)" />
                 }
                 else
                 {
-                    <select class="form-select flex-grow-1" style="max-width: 40%;" @bind="searchTerm">
+                    <select class="form-select" style="width: auto;" @bind="searchTerm">
                         <option value="">Bitte wählen...</option>
                         @if (searchCategory == "Werk")
                         {
@@ -102,7 +104,7 @@
                     </select>
                 }
 
-                <div class="d-flex w-100-mobile gap-2">
+                <div class="d-flex w-100 gap-2">
                     <button class="btn btn-secondary flex-grow-1" @onclick="RefreshList">Zeige</button>
 
                     <button class="btn flex-grow-1 d-md-none" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="OpenConcertLocationModal">
@@ -119,6 +121,7 @@
                         <li><a class="dropdown-item" role="button" @onclick="OpenExportModal">Export</a></li>
                         <AuthorizeView Roles="Admin" Context="userAdminContext">
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" role="button" @onclick="OpenAiTestModal">KI-Test</a></li>
                             <li><a class="dropdown-item" role="button" @onclick="OpenUserListModal">Benutzerverwaltung</a></li>
                         </AuthorizeView>
                     </ul>
@@ -815,10 +818,6 @@
         else
         {
             <p>Keine Daten gefunden.</p>
-            @if (!string.IsNullOrEmpty(ConcertPreviewErrorMessage))
-            {
-                <small class="text-danger">@ConcertPreviewErrorMessage</small>
-            }
             <div class="d-flex justify-content-end gap-2 mt-3">
                  <button class="btn btn-secondary" @onclick="() => CloseConcertPreviewModal(false)">Schließen</button>
             </div>
@@ -826,7 +825,104 @@
     </ChildContent>
 </ModalDialog>
 
+@* KI-Test Modal *@
+@if (showAiTestModal)
+{
+    <div class="modal fade show" tabindex="-1" role="dialog" style="display: block; background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">KI-Test</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAiTestModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3 row align-items-center">
+                        <label for="aiModelSelect" class="col-sm-4 col-form-label fw-bold">Aktuelles Modell:</label>
+                        <div class="col-sm-8">
+                            <select id="aiModelSelect" class="form-select" @bind="selectedAiModel">
+                                <option value="@AiSettings.Value.Model">@AiSettings.Value.Model</option>
+                                @if (!string.IsNullOrEmpty(AiSettings.Value.ModelReasoning))
+                                {
+                                    <option value="@AiSettings.Value.ModelReasoning">@AiSettings.Value.ModelReasoning</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="aiPromptSelect" class="form-label">Prompt auswählen</label>
+                        <select id="aiPromptSelect" class="form-select" @bind="selectedAiPrompt">
+                            <option value="Wie gehts?">Wie gehts?</option>
+                            <option value="Wie ist das Wetter?">Wie ist das Wetter?</option>
+                        </select>
+                    </div>
+                    @if (!string.IsNullOrEmpty(aiTestResult))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Ergebnis</label>
+                            <textarea class="form-control" rows="4" readonly>@aiTestResult</textarea>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @onclick="StartAiTest" disabled="@isAiTestLoading">
+                        @if (isAiTestLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <span>Start</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-secondary" @onclick="CloseAiTestModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
+    // --- KI-Test State ---
+    private bool showAiTestModal = false;
+    private string selectedAiPrompt = "Wie gehts?";
+    private string selectedAiModel = "";
+    private string aiTestResult = "";
+    private bool isAiTestLoading = false;
+
+    private void OpenAiTestModal()
+    {
+        showAiTestModal = true;
+        selectedAiPrompt = "Wie gehts?";
+        selectedAiModel = AiSettings.Value.Model;
+        aiTestResult = "";
+    }
+
+    private void CloseAiTestModal()
+    {
+        showAiTestModal = false;
+    }
+
+    private async Task StartAiTest()
+    {
+        isAiTestLoading = true;
+        aiTestResult = "";
+        StateHasChanged();
+
+        try
+        {
+            aiTestResult = await AiService.TestAiRequest(selectedAiPrompt, selectedAiModel);
+        }
+        catch (Exception ex)
+        {
+            aiTestResult = $"Fehler: {ex.Message}";
+        }
+        finally
+        {
+            isAiTestLoading = false;
+            StateHasChanged();
+        }
+    }
+
     private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
     private int selectedLimit = 5;
 
@@ -838,13 +934,11 @@
     private string ConcertPreviewLocation = "";
     private DateTime ConcertPreviewDate;
     private bool IsConcertPreviewLoading = false;
-    private string ConcertPreviewErrorMessage = "";
 
     private Task CloseConcertPreviewModal(bool result)
     {
         ShowConcertPreviewModal = false;
         ConcertPreviewData = null;
-        ConcertPreviewErrorMessage = "";
         return Task.CompletedTask;
     }
 
@@ -1065,8 +1159,7 @@
         DeleteRecordId = 0;
     }
 
-    // --- Konzert Anfrage (Heute/Preview) ---
-    private CancellationTokenSource? aiCts;
+    // --- Concert Check Modal ---
     private bool ShowConcertLocationModal = false;
     private List<string> ConcertLocations = new();
 
@@ -1108,44 +1201,17 @@
 
         IsConcertPreviewLoading = true;
         ShowConcertPreviewModal = true;
-        ConcertPreviewErrorMessage = "";
         StateHasChanged();
 
-        try
-        {
-            aiCts?.Cancel();
-            aiCts?.Dispose();
-            aiCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        ConcertPreviewData = await AiService.GetConcertPreview(ConcertPreviewLocation, ConcertPreviewDate);
+        IsConcertPreviewLoading = false;
 
-            ConcertPreviewData = await AiService.GetConcertPreview(ConcertPreviewLocation, ConcertPreviewDate, aiCts.Token);
-
-            if (ConcertPreviewData == null)
-            {
-                ConcertPreviewErrorMessage = AiErrorMessage;
-            }
-        }
-        catch (TaskCanceledException)
+        if (ConcertPreviewData == null)
         {
             ShowConcertPreviewModal = false;
-            await ShowInfo("Die AI Anfrage wurde abgebrochen oder ein Timeout (10 Min) wurde erreicht.");
+            await ShowInfo(AiErrorMessage);
         }
-        catch (Exception ex)
-        {
-            ConcertPreviewErrorMessage = "Ein Fehler ist aufgetreten.\nFehler: " + ex.Message;
-            // Let the modal stay open to show the error message.
-            ConcertPreviewData = null;
-        }
-        finally
-        {
-            IsConcertPreviewLoading = false;
-            StateHasChanged();
-        }
-    }
-
-    public void Dispose()
-    {
-        aiCts?.Cancel();
-        aiCts?.Dispose();
+        StateHasChanged();
     }
 
     // --- Edit (Full) ---
@@ -1372,7 +1438,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in FillMasterAi");
-            await JS.InvokeVoidAsync("alert", AiErrorMessage + "\nFehler: " + ex.Message);
+            await JS.InvokeVoidAsync("alert", AiErrorMessage);
         }
     }
 

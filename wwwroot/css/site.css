@@ -124,13 +124,6 @@ a:hover, .btn-link:hover {
         flex-direction: column;
         align-items: stretch !important;
     }
-    .search-container input,
-    .search-container select {
-        max-width: 100% !important;
-    }
-    .search-container .w-100-mobile {
-        width: 100% !important;
-    }
     .search-container > * {
         width: 100% !important;
         margin-bottom: 5px;
