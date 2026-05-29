@@ -3,6 +3,7 @@
 @using System.Text.Json
 @using System.Text.Json.Serialization
 @using MaestroNotes.Data
+@using MaestroNotes.Data.Ai
 @using MaestroNotes.Shared
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.Extensions.Logging
@@ -11,9 +12,11 @@
 @using static MaestroNotes.Services.MusicService
 
 @inject MusicService Service
+@using Microsoft.Extensions.Options
 @inject AiService AiService
 @inject IJSRuntime JS
 @inject ILogger<Index> Logger
+@inject IOptions<AiSettings> AiSettings
 
 <PageTitle>Meine Konzerte</PageTitle>
 
@@ -24,8 +27,8 @@
     </div>
 }
 
-<div>
-    <div>
+<AuthorizeView>
+    <Authorized>
         @if (EditMusicRecord is not null)
         {
             <h3>Bearbeiten</h3>
@@ -116,10 +119,11 @@
                     <ul class="dropdown-menu" aria-labelledby="dropdownSpecials">
                         <li><a class="dropdown-item" role="button" @onclick="OpenAiFillModal">KI Vervollständigen</a></li>
                         <li><a class="dropdown-item" role="button" @onclick="OpenExportModal">Export</a></li>
-                        <div>
+                        <li><a class="dropdown-item" role="button" @onclick="OpenAiTestModal">KI-Test</a></li>
+                        <AuthorizeView Roles="Admin" Context="userAdminContext">
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" role="button" @onclick="OpenUserListModal">Benutzerverwaltung</a></li>
-                        </div>
+                        </AuthorizeView>
                     </ul>
                 </div>
 
@@ -132,7 +136,7 @@
                     }
                 </select>
 
-                <div>
+                <AuthorizeView Roles="Admin, Operator" Context="adminContext">
                     <div class="dropdown d-none d-md-inline-block me-2">
                         <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMaster" data-bs-toggle="dropdown" aria-expanded="false">
                             Stammdaten
@@ -149,7 +153,7 @@
                     <button class="btn btn-primary d-none d-md-inline-block" @onclick="() => AddNew()" title="Neuer Eintrag">
                         <i class="fas fa-plus"></i>
                     </button>
-                </div>
+                </AuthorizeView>
             </div>
 
             <div class="table-responsive d-none d-md-block">
@@ -199,7 +203,7 @@
                                                 </a>
                                             </li>
 
-                                            <div>
+                                            <AuthorizeView Roles="Admin, Operator" Context="adminItemContext">
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <a class="dropdown-item" role="button" @onclick="() => OpenUploadModal(record)">
@@ -216,7 +220,7 @@
                                                         <i class="fas fa-trash me-2"></i> Löschen
                                                     </a>
                                                 </li>
-                                            </div>
+                                            </AuthorizeView>
                                         </ul>
                                     </div>
                                 </td>
@@ -262,16 +266,16 @@
                 }
             </div>
         }
-    </div>
-    <div style="display:none">
+    </Authorized>
+    <NotAuthorized>
         <div class="text-center mt-5">
             <h3 class="mb-4">Meine Konzerte</h3>
             <p> <img src="Images/dresden.jpg" class="img-fluid rounded shadow" style="max-height: 500px;" /> </p>
             <p class="mt-4">Bitte melden Sie sich an, um auf die Konzertdatenbank zuzugreifen.</p>
             <a href="/login" class="btn btn-primary btn-lg mt-2">Zum Login</a>
         </div>
-    </div>
-</div>
+    </NotAuthorized>
+</AuthorizeView>
 
 @* --- Modals --- *@
 
@@ -320,11 +324,11 @@
                                 <label class="form-check-label small text-muted" for="chk-doc-@item.id">Vormerken für Export</label>
                             </div>
                         </div>
-                        <div>
+                        <AuthorizeView Roles="Admin, Operator" Context="docAdmin">
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                 <i class="fas fa-trash"></i>
                             </button>
-                        </div>
+                        </AuthorizeView>
                     </div>
                 }
 
@@ -341,11 +345,11 @@
                                     <label class="form-check-label small text-muted" for="chk-img-@item.id">Vormerken für Export</label>
                                 </div>
                              </div>
-                             <div>
+                             <AuthorizeView Roles="Admin, Operator" Context="imgAdmin">
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFile(item.id)">
                                     <i class="fas fa-trash"></i>
                                 </button>
-                             </div>
+                             </AuthorizeView>
                         </div>
                     </div>
                 }
@@ -821,7 +825,94 @@
     </ChildContent>
 </ModalDialog>
 
+@* KI-Test Modal *@
+@if (showAiTestModal)
+{
+    <div class="modal fade show" tabindex="-1" role="dialog" style="display: block; background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">KI-Test</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAiTestModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <strong>Aktuelles Modell:</strong> @AiSettings.Value.Model
+                    </div>
+                    <div class="mb-3">
+                        <label for="aiPromptSelect" class="form-label">Prompt auswählen</label>
+                        <select id="aiPromptSelect" class="form-select" @bind="selectedAiPrompt">
+                            <option value="Wie gehts?">Wie gehts?</option>
+                            <option value="Wie ist das Wetter?">Wie ist das Wetter?</option>
+                        </select>
+                    </div>
+                    @if (!string.IsNullOrEmpty(aiTestResult))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Ergebnis</label>
+                            <textarea class="form-control" rows="4" readonly>@aiTestResult</textarea>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @onclick="StartAiTest" disabled="@isAiTestLoading">
+                        @if (isAiTestLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <span>Start</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-secondary" @onclick="CloseAiTestModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
+    // --- KI-Test State ---
+    private bool showAiTestModal = false;
+    private string selectedAiPrompt = "Wie gehts?";
+    private string aiTestResult = "";
+    private bool isAiTestLoading = false;
+
+    private void OpenAiTestModal()
+    {
+        showAiTestModal = true;
+        selectedAiPrompt = "Wie gehts?";
+        aiTestResult = "";
+    }
+
+    private void CloseAiTestModal()
+    {
+        showAiTestModal = false;
+    }
+
+    private async Task StartAiTest()
+    {
+        isAiTestLoading = true;
+        aiTestResult = "";
+        StateHasChanged();
+
+        try
+        {
+            var modelName = AiSettings.Value.Model;
+            aiTestResult = await AiService.TestAiRequest(selectedAiPrompt, modelName);
+        }
+        catch (Exception ex)
+        {
+            aiTestResult = $"Fehler: {ex.Message}";
+        }
+        finally
+        {
+            isAiTestLoading = false;
+            StateHasChanged();
+        }
+    }
+
     private Dictionary<int, string> limitOptions = new() { { 5, "Letzte 5" }, { 10, "Letzte 10" }, { 0, "All" } };
     private int selectedLimit = 5;
 
