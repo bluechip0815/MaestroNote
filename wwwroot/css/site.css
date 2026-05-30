@@ -117,6 +117,12 @@ a:hover, .btn-link:hover {
     }
 }
 
+/* Search inputs max width for Desktop */
+.search-input {
+    width: auto;
+    max-width: 30vw;
+}
+
 /* Mobile Styles */
 @media (max-width: 768px) {
     /* Search Section */
@@ -132,6 +138,7 @@ a:hover, .btn-link:hover {
     .search-container input,
     .search-container button {
         width: 100% !important;
+        max-width: 100% !important;
     }
 
     .date-search, .btn-add {

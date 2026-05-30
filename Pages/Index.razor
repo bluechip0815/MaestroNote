@@ -46,11 +46,11 @@
 
                 @if (searchCategory == "Note")
                 {
-                    <input type="text" class="form-control" style="width: 200px;" @bind="searchTerm" placeholder="(* und ? möglich)" />
+                    <input type="text" class="form-control search-input" @bind="searchTerm" placeholder="(* und ? möglich)" />
                 }
                 else
                 {
-                    <select class="form-select" style="width: auto;" @bind="searchTerm">
+                    <select class="form-select search-input" @bind="searchTerm">
                         <option value="">Bitte wählen...</option>
                         @if (searchCategory == "Werk")
                         {
@@ -104,7 +104,7 @@
                     </select>
                 }
 
-                <div class="d-flex w-100 gap-2">
+                <div class="d-flex gap-2">
                     <button class="btn btn-secondary flex-grow-1" @onclick="RefreshList">Zeige</button>
 
                     <button class="btn flex-grow-1 d-md-none" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="OpenConcertLocationModal">
