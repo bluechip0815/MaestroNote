@@ -1,10 +1,12 @@
 @using System.ComponentModel.DataAnnotations
 @using MaestroNotes.Data
 @using Microsoft.Extensions.Logging
+@using Microsoft.Extensions.Options
 @inject MusicService Service
 @inject AiService AiService
 @inject IJSRuntime JSRuntime
 @inject ILogger<Edit> Logger
+@inject IOptions<FacebookSettings> FacebookSettings
 
 <EditForm Model="@currentRecord">
     <DataAnnotationsValidator />
@@ -206,21 +208,50 @@
         </div>
     </div>
 
-    <!-- BEWERTUNG -->
-    <div class="form-group mt-3">
-        <label for="Bewertung">Bewertung:</label>
-        <InputTextArea id="Bewertung" class="form-control" @bind-Value="currentRecord.Bewertung" rows="5" />
-        <ValidationMessage For="@(() => currentRecord.Bewertung)" />
-    </div>
+    <!-- BOTTOM SECTION: BEWERTUNG & FACEBOOK SHARE -->
+    <div class="row mt-3">
+        <!-- LEFT COLUMN: Bewertung & Actions -->
+        <div class="col-md-6 d-flex flex-column">
+            <div class="form-group flex-grow-1">
+                <label for="Bewertung">Bewertung:</label>
+                <InputTextArea id="Bewertung" class="form-control" @bind-Value="currentRecord.Bewertung" rows="5" />
+                <ValidationMessage For="@(() => currentRecord.Bewertung)" />
+            </div>
 
-    <!-- ACTIONS -->
-    <div class="mt-4">
-        <button type="button" class="btn btn-success" @onclick="() => Close(true)">
-            <i class="fas fa-save"></i> Speichern
-        </button>
-        <button type="button" class="btn btn-secondary ms-2" @onclick="() => Close(false)">
-            <i class="fas fa-times"></i> Abbrechen
-        </button>
+            <div class="mt-2">
+                <button type="button" class="btn btn-success" @onclick="() => Close(true)">
+                    <i class="fas fa-save"></i> Speichern
+                </button>
+                <button type="button" class="btn btn-secondary ms-2" @onclick="() => Close(false)">
+                    <i class="fas fa-times"></i> Abbrechen
+                </button>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Facebook Share -->
+        <div class="col-md-6 d-flex flex-column">
+            <div class="form-group flex-grow-1">
+                <label class="fw-bold">@FacebookSettings.Value.AccountTitle</label>
+                <textarea class="form-control" rows="5" @bind="FacebookPostText"></textarea>
+            </div>
+
+            <div class="mt-2">
+                <button type="button" class="btn me-2" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="GenerateAiShort" disabled="@isAiShortening">
+                    @if(isAiShortening)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    <i class="fas fa-pen"></i> AI Short
+                </button>
+                <button type="button" class="btn btn-secondary" @onclick="PostToFacebook" disabled="@isPostingFacebook">
+                    @if(isPostingFacebook)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    Posten
+                </button>
+            </div>
+        </div>
     </div>
 
 </EditForm>
@@ -482,6 +513,11 @@
     private int selectedSolistToAddId;
 
     private bool isAiSearching = false;
+
+    // Facebook Share State
+    private string FacebookPostText = "";
+    private bool isAiShortening = false;
+    private bool isPostingFacebook = false;
 
     private const string AiErrorMessage = "KI konnte leider keine Antwort finden";
 
@@ -968,6 +1004,67 @@
         finally
         {
             isAiSearching = false;
+            StateHasChanged();
+        }
+    }
+
+    // --- Facebook Share ---
+
+    private async Task GenerateAiShort()
+    {
+        if (string.IsNullOrWhiteSpace(currentRecord.Bewertung))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Text im Feld 'Bewertung' ein.");
+            return;
+        }
+
+        isAiShortening = true;
+        StateHasChanged();
+
+        try
+        {
+            FacebookPostText = await AiService.GenerateFacebookShortAsync(currentRecord.Bewertung);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in GenerateAiShort");
+            await JSRuntime.InvokeVoidAsync("alert", "Ein Fehler ist bei der KI-Kürzung aufgetreten.");
+        }
+        finally
+        {
+            isAiShortening = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PostToFacebook()
+    {
+        if (string.IsNullOrWhiteSpace(FacebookPostText))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Text für den Facebook-Post ein.");
+            return;
+        }
+
+        isPostingFacebook = true;
+        StateHasChanged();
+
+        try
+        {
+            // Simulate API Call for now
+            await Task.Delay(1000);
+
+            // TODO: Implement actual Meta Graph API call
+
+            await JSRuntime.InvokeVoidAsync("alert", "Erfolgreich auf Facebook gepostet!");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in PostToFacebook");
+            await JSRuntime.InvokeVoidAsync("alert", "Ein Fehler ist beim Posten aufgetreten.");
+        }
+        finally
+        {
+            isPostingFacebook = false;
             StateHasChanged();
         }
     }

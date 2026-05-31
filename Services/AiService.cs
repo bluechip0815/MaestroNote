@@ -337,6 +337,24 @@ namespace MaestroNotes.Services
             }
         }
 
+        public Task<string> GenerateFacebookShortAsync(string bewertungText)
+        {
+            if (string.IsNullOrWhiteSpace(bewertungText))
+            {
+                return Task.FromResult(string.Empty);
+            }
+
+            // Placeholder logic: just truncate and add ellipsis for now
+            string shortened = bewertungText.Length > 100
+                ? bewertungText.Substring(0, 100) + "..."
+                : bewertungText;
+
+            // In a real implementation, you would use _aiProvider to call the LLM to summarize the text
+            // e.g. return await _aiProvider.SendRequestAsync(..., bewertungText, ...);
+
+            return Task.FromResult(shortened);
+        }
+
         private string StripMarkdown(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
