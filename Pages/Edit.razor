@@ -5,6 +5,7 @@
 @inject MusicService Service
 @inject AiService AiService
 @inject IJSRuntime JSRuntime
+@inject IFacebookService FacebookService
 @inject ILogger<Edit> Logger
 @inject IOptions<FacebookSettings> FacebookSettings
 
@@ -1050,17 +1051,13 @@
 
         try
         {
-            // Simulate API Call for now
-            await Task.Delay(1000);
-
-            // TODO: Implement actual Meta Graph API call
-
+            await FacebookService.PostToFeedAsync(FacebookPostText);
             await JSRuntime.InvokeVoidAsync("alert", "Erfolgreich auf Facebook gepostet!");
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error in PostToFacebook");
-            await JSRuntime.InvokeVoidAsync("alert", "Ein Fehler ist beim Posten aufgetreten.");
+            await JSRuntime.InvokeVoidAsync("alert", "Fehler beim Posten: " + ex.Message);
         }
         finally
         {
