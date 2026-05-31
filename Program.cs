@@ -19,6 +19,7 @@ builder.Services.AddControllers();
 
 // Configure AI Settings
 builder.Services.Configure<AiSettings>(builder.Configuration.GetSection("AiSettings"));
+builder.Services.Configure<FacebookSettings>(builder.Configuration.GetSection("FacebookSettings"));
 
 string? connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 // string? serverVersion = builder.Configuration.GetConnectionString("ServerVersion"); // Unused
