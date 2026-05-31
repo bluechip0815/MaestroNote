@@ -208,48 +208,48 @@
         </div>
     </div>
 
-    <!-- BEWERTUNG -->
-    <div class="form-group mt-3">
-        <label for="Bewertung">Bewertung:</label>
-        <InputTextArea id="Bewertung" class="form-control" @bind-Value="currentRecord.Bewertung" rows="5" />
-        <ValidationMessage For="@(() => currentRecord.Bewertung)" />
-    </div>
+    <!-- BOTTOM SECTION: BEWERTUNG & FACEBOOK SHARE -->
+    <div class="row mt-3">
+        <!-- LEFT COLUMN: Bewertung & Actions -->
+        <div class="col-md-6 d-flex flex-column">
+            <div class="form-group flex-grow-1">
+                <label for="Bewertung">Bewertung:</label>
+                <InputTextArea id="Bewertung" class="form-control" @bind-Value="currentRecord.Bewertung" rows="5" />
+                <ValidationMessage For="@(() => currentRecord.Bewertung)" />
+            </div>
 
-    <!-- ACTIONS & FACEBOOK SHARE -->
-    <div class="d-flex justify-content-between align-items-end mt-4">
-        <!-- LEFT: Actions -->
-        <div>
-            <button type="button" class="btn btn-success" @onclick="() => Close(true)">
-                <i class="fas fa-save"></i> Speichern
-            </button>
-            <button type="button" class="btn btn-secondary ms-2" @onclick="() => Close(false)">
-                <i class="fas fa-times"></i> Abbrechen
-            </button>
+            <div class="mt-2">
+                <button type="button" class="btn btn-success" @onclick="() => Close(true)">
+                    <i class="fas fa-save"></i> Speichern
+                </button>
+                <button type="button" class="btn btn-secondary ms-2" @onclick="() => Close(false)">
+                    <i class="fas fa-times"></i> Abbrechen
+                </button>
+            </div>
         </div>
 
-        <!-- RIGHT: Facebook Share Box -->
-        <div class="border p-2" style="width: 450px; background-color: #fcfcfc;">
-            <div class="d-flex mb-2">
-                <div class="d-flex flex-column me-2" style="width: 100px;">
-                    <button type="button" class="btn mb-2" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="GenerateAiShort" disabled="@isAiShortening">
-                        @if(isAiShortening)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                        }
-                        <i class="fas fa-magic"></i> AI Short
-                    </button>
-                    <button type="button" class="btn btn-secondary" @onclick="PostToFacebook" disabled="@isPostingFacebook">
-                        @if(isPostingFacebook)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                        }
-                        Posten
-                    </button>
-                </div>
-                <div class="flex-grow-1">
-                    <div class="fw-bold mb-1" style="font-size: 0.9em;">@FacebookSettings.Value.AccountTitle</div>
-                    <textarea class="form-control" rows="3" @bind="FacebookPostText"></textarea>
-                </div>
+        <!-- RIGHT COLUMN: Facebook Share -->
+        <div class="col-md-6 d-flex flex-column">
+            <div class="form-group flex-grow-1">
+                <label class="fw-bold">@FacebookSettings.Value.AccountTitle</label>
+                <textarea class="form-control" rows="5" @bind="FacebookPostText"></textarea>
+            </div>
+
+            <div class="mt-2">
+                <button type="button" class="btn me-2" style="background-color: #ff9999; border-color: #ff8888; color: #000;" @onclick="GenerateAiShort" disabled="@isAiShortening">
+                    @if(isAiShortening)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    <i class="fas fa-pen"></i> AI<br />Short
+                </button>
+                <button type="button" class="btn btn-secondary" @onclick="PostToFacebook" disabled="@isPostingFacebook">
+                    @if(isPostingFacebook)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    Posten
+                </button>
             </div>
         </div>
     </div>
