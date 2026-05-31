@@ -60,13 +60,15 @@ namespace MaestroNotes.Services
         private readonly AiSettings _settings;
         private readonly ILogger<AiService> _logger;
         private readonly MusicService _musicService;
+        private readonly FacebookSettings _facebookSettings;
 
-        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings, ILogger<AiService> logger, MusicService musicService)
+        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings, ILogger<AiService> logger, MusicService musicService, IOptions<FacebookSettings> facebookSettings)
         {
             _aiProvider = aiProvider;
             _settings = settings.Value;
             _logger = logger;
             _musicService = musicService;
+            _facebookSettings = facebookSettings.Value;
         }
 
         public async Task<string> TestAiRequest(string prompt, string modelName)
@@ -337,22 +339,27 @@ namespace MaestroNotes.Services
             }
         }
 
-        public Task<string> GenerateFacebookShortAsync(string bewertungText)
+        public async Task<string> GenerateFacebookShortAsync(string bewertungText)
         {
             if (string.IsNullOrWhiteSpace(bewertungText))
             {
-                return Task.FromResult(string.Empty);
+                return string.Empty;
             }
 
-            // Placeholder logic: just truncate and add ellipsis for now
-            string shortened = bewertungText.Length > 100
-                ? bewertungText.Substring(0, 100) + "..."
-                : bewertungText;
+            try
+            {
+                string combinedPrompt = $"{_facebookSettings.UserPrompt}\n\n\n{bewertungText}";
 
-            // In a real implementation, you would use _aiProvider to call the LLM to summarize the text
-            // e.g. return await _aiProvider.SendRequestAsync(..., bewertungText, ...);
+                _logger.LogInformation("Generating Facebook short text");
+                string jsonResponse = await _aiProvider.SendRequestAsync("", combinedPrompt, _settings.Model);
 
-            return Task.FromResult(shortened);
+                return jsonResponse;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GenerateFacebookShortAsync");
+                throw;
+            }
         }
 
         private string StripMarkdown(string text)
