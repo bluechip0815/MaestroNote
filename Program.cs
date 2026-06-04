@@ -1,4 +1,5 @@
 using MaestroNotes.Data;
+using MaestroNotes.Configuration;
 using MaestroNotes.Data.Ai;
 using MaestroNotes.Services;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -30,6 +31,9 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Register Music Service
 builder.Services.AddScoped<MusicService>();
+
+// Register Facebook Service
+builder.Services.AddHttpClient<IFacebookService, FacebookService>();
 
 // Register Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
