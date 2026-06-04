@@ -1,9 +1,5 @@
-using System;
-using System.Net.Http;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using MaestroNotes.Configuration;
-using System.Collections.Generic;
 
 namespace MaestroNotes.Services
 {
@@ -25,7 +21,11 @@ namespace MaestroNotes.Services
                 throw new InvalidOperationException("Facebook PageId or PageAccessToken is not configured.");
             }
 
-            var url = $"https://graph.facebook.com/v21.0/{_settings.PageId}/feed";
+    //        var response1 = await _httpClient.GetAsync($"https://graph.facebook.com/debug_token?input_token={_settings.PageAccessToken}&access_token={_settings.PageAccessToken}");
+    //        var json = await response1.Content.ReadAsStringAsync();
+    //        Console.WriteLine(json);
+
+            var url = $"https://graph.facebook.com/v21.0/me/feed";
 
             var content = new FormUrlEncodedContent(new[]
             {
