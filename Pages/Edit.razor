@@ -231,7 +231,14 @@
         <!-- RIGHT COLUMN: Facebook Share -->
         <div class="col-md-6 d-flex flex-column">
             <div class="form-group flex-grow-1">
-                <label class="fw-bold">@FacebookSettings.Value.AccountTitle</label>
+                <div class="d-flex align-items-center mb-1">
+                    <label class="fw-bold me-3">@FacebookSettings.Value.AccountTitle</label>
+                    <select class="form-select form-select-sm" style="width: auto; border: 2px solid black; border-radius: 4px;" @bind="SelectedFacebookTone">
+                        <option value="Neutral">neutral</option>
+                        <option value="Zynisch">zynisch</option>
+                        <option value="Applaus">applaus</option>
+                    </select>
+                </div>
                 <textarea class="form-control" rows="5" @bind="FacebookPostText"></textarea>
             </div>
 
@@ -512,6 +519,7 @@
 
     // Facebook Share State
     private string FacebookPostText = "";
+    private string SelectedFacebookTone = "Neutral";
     private bool isAiShortening = false;
 
     private const string AiErrorMessage = "KI konnte leider keine Antwort finden";
@@ -1018,7 +1026,7 @@
 
         try
         {
-            FacebookPostText = await AiService.GenerateFacebookShortAsync(currentRecord.Bewertung);
+            FacebookPostText = await AiService.GenerateFacebookShortAsync(currentRecord.Bewertung, SelectedFacebookTone);
         }
         catch (Exception ex)
         {

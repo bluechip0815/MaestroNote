@@ -1,5 +1,6 @@
 using MaestroNotes.Data;
 using MaestroNotes.Data.Ai;
+using MaestroNotes.Configuration;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -58,13 +59,15 @@ namespace MaestroNotes.Services
     {
         private readonly IAiProvider _aiProvider;
         private readonly AiSettings _settings;
+        private readonly FacebookSettings _fbSettings;
         private readonly ILogger<AiService> _logger;
         private readonly MusicService _musicService;
 
-        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings, ILogger<AiService> logger, MusicService musicService)
+        public AiService(IAiProvider aiProvider, IOptions<AiSettings> settings, IOptions<FacebookSettings> fbSettings, ILogger<AiService> logger, MusicService musicService)
         {
             _aiProvider = aiProvider;
             _settings = settings.Value;
+            _fbSettings = fbSettings.Value;
             _logger = logger;
             _musicService = musicService;
         }
@@ -337,22 +340,35 @@ namespace MaestroNotes.Services
             }
         }
 
-        public Task<string> GenerateFacebookShortAsync(string bewertungText)
+        public async Task<string> GenerateFacebookShortAsync(string bewertungText, string tone)
         {
             if (string.IsNullOrWhiteSpace(bewertungText))
             {
-                return Task.FromResult(string.Empty);
+                return string.Empty;
             }
 
-            // Placeholder logic: just truncate and add ellipsis for now
-            string shortened = bewertungText.Length > 100
-                ? bewertungText.Substring(0, 100) + "..."
-                : bewertungText;
+            string systemPrompt = ""; // Empty string per rules
 
-            // In a real implementation, you would use _aiProvider to call the LLM to summarize the text
-            // e.g. return await _aiProvider.SendRequestAsync(..., bewertungText, ...);
+            string userPromptBase = tone switch
+            {
+                "Zynisch" => _fbSettings.UserPromptZynisch,
+                "Applaus" => _fbSettings.UserPromptApplaus,
+                _ => _fbSettings.UserPromptNeutral
+            };
 
-            return Task.FromResult(shortened);
+            string userPrompt = $"{userPromptBase}\n\n\n{bewertungText}";
+
+            // Send to AI
+            try
+            {
+                string modelToUse = !string.IsNullOrEmpty(_settings.ModelReasoning) ? _settings.ModelReasoning : _settings.Model;
+                return await _aiProvider.SendRequestAsync(systemPrompt, userPrompt, modelToUse);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Facebook AI Short request failed");
+                throw new ApplicationException($"Facebook AI request failed: {ex.Message}", ex);
+            }
         }
 
         private string StripMarkdown(string text)
