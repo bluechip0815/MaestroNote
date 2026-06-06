@@ -53,7 +53,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                         var dbContext = context.HttpContext.RequestServices.GetRequiredService<MusicContext>();
                         var token = await dbContext.LoginTokens.FirstOrDefaultAsync(t => t.Token == tokenGuid);
 
-                        if (token == null || token.CreatedAt < DateTime.UtcNow.AddDays(-30))
+                        if (token == null || token.CreatedAt < DateTime.UtcNow.AddDays(-60))
                         {
                             context.RejectPrincipal();
                             await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
