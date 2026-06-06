@@ -5,7 +5,6 @@
 @inject MusicService Service
 @inject AiService AiService
 @inject IJSRuntime JSRuntime
-@inject IFacebookService FacebookService
 @inject ILogger<Edit> Logger
 @inject IOptions<FacebookSettings> FacebookSettings
 
@@ -244,12 +243,8 @@
                     }
                     <i class="fas fa-pen"></i> AI Short
                 </button>
-                <button type="button" class="btn btn-secondary" @onclick="PostToFacebook" disabled="@isPostingFacebook">
-                    @if(isPostingFacebook)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                    }
-                    Posten
+                <button type="button" class="btn btn-secondary" @onclick="OpenFacebookPage">
+                    Facebook
                 </button>
             </div>
         </div>
@@ -518,7 +513,6 @@
     // Facebook Share State
     private string FacebookPostText = "";
     private bool isAiShortening = false;
-    private bool isPostingFacebook = false;
 
     private const string AiErrorMessage = "KI konnte leider keine Antwort finden";
 
@@ -1038,31 +1032,9 @@
         }
     }
 
-    private async Task PostToFacebook()
+    private async Task OpenFacebookPage()
     {
-        if (string.IsNullOrWhiteSpace(FacebookPostText))
-        {
-            await JSRuntime.InvokeVoidAsync("alert", "Bitte geben Sie zuerst einen Text für den Facebook-Post ein.");
-            return;
-        }
-
-        isPostingFacebook = true;
-        StateHasChanged();
-
-        try
-        {
-            await FacebookService.PostToFeedAsync(FacebookPostText);
-            await JSRuntime.InvokeVoidAsync("alert", "Erfolgreich auf Facebook gepostet!");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error in PostToFacebook");
-            await JSRuntime.InvokeVoidAsync("alert", "Fehler beim Posten: " + ex.Message);
-        }
-        finally
-        {
-            isPostingFacebook = false;
-            StateHasChanged();
-        }
+        var url = $"https://www.facebook.com/{FacebookSettings.Value.PageId}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
     }
 }
