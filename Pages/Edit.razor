@@ -1042,6 +1042,19 @@
 
     private async Task OpenFacebookPage()
     {
+        if (!string.IsNullOrWhiteSpace(FacebookPostText))
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", FacebookPostText);
+                await JSRuntime.InvokeVoidAsync("alert", "Text in die Zwischenablage kopiert!");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Fehler beim Kopieren in die Zwischenablage.");
+            }
+        }
+
         var url = $"https://www.facebook.com/{FacebookSettings.Value.PageId}";
         await JSRuntime.InvokeVoidAsync("open", url, "_blank");
     }
